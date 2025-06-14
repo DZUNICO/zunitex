@@ -13,7 +13,6 @@ import ProjectForm from '@/components/projects/project-form';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
-
 export default function ProjectsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);

@@ -26,32 +26,46 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
-    // Configurar persistencia local
-    setPersistence(auth, browserLocalPersistence).catch(console.error);
+    const initAuth = async () => {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            try {
+              await setDoc(doc(db, 'users', user.uid), {
+                lastLogin: new Date().toISOString()
+              }, { merge: true });
+              setUser(user);
+            } catch (error) {
+              console.error('Error updating last login:', error);
+            }
+          } else {
+            setUser(null);
+          }
+          setLoading(false);
+          setAuthInitialized(true);
+        });
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Si el usuario está autenticado, actualizamos su último login
-        await setDoc(doc(db, 'users', user.uid), {
-          lastLogin: new Date().toISOString()
-        }, { merge: true }); // merge: true permite actualizar solo este campo
-        setUser(user);
-      } else {
-        setUser(null);
+        return () => unsubscribe();
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        setLoading(false);
+        setAuthInitialized(true);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    initAuth();
   }, []);
 
+  // Mantener el resto de tus funciones exactamente igual
   const signUp = async (email: string, password: string, displayName: string, phone: string) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Crear perfil de usuario en Firestore
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email,
         displayName,
@@ -89,16 +103,20 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  if (!authInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={{ user, loading, signUp, signIn, logout }}>
-      {!loading ? children : 
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4">Cargando...</p>
-          </div>
-        </div>
-      }
+      {children}
     </AuthContext.Provider>
   );
 };

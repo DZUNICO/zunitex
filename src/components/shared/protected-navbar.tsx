@@ -34,6 +34,12 @@ import {
 import { cn } from '@/lib/utils';
 
 const menuItems = [
+  {
+    icon: FileText, 
+    label: 'Blog',
+    href: '/blog',
+    description: 'Artículos y tutoriales'
+  },
   { 
     icon: LayoutDashboard, 
     label: 'Dashboard', 
@@ -130,6 +136,11 @@ export function Navbar() {
               ElectricianHub
             </span>
           </Link>
+          {user?.email === 'diego.zuni@gmail.com' && (
+            <Link href="/admin/blog" className="...">
+              Admin
+            </Link>
+          )}
 
           {/* Navegación principal - escritorio */}
           <div className="hidden md:flex items-center space-x-1">

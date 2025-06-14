@@ -15,7 +15,7 @@
   export interface UserProfile extends BaseProfile {
     id?: string;
     phone: string;
-    role: string;
+    role: 'admin' | 'user';
     photoURL?: string;  // Campo original de avatar
     certifications?: string[];
   }
@@ -24,7 +24,7 @@
   export interface ProfileHeader extends BaseProfile {
     id: string;  // Requerido específicamente para el header
     photoURL: string | null;
-    role: string;
+    role: 'admin' | 'user';
   }
   
   // Props para el componente ProfileHeader

@@ -25,10 +25,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
-     {/*  <StatsCards /> */}
+      <StatsCards />
 
       {/* Recent Projects */}
-      {/* <RecentProjects /> */}
+      <RecentProjects />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { ToastProvider } from '@/components/providers/toast-provider';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/context/auth-context';
+import { NavigationProgress } from '@/components/providers/navigation-progress';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
+        <NavigationProgress />
         <AuthProvider>
           <main className="min-h-screen bg-background">
             {children}
