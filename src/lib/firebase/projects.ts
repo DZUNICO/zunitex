@@ -3,6 +3,7 @@ import { db, storage } from './config';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs,getDoc } from 'firebase/firestore';
 import type { Project } from '@/types/project';
 import { deleteObject, ref } from 'firebase/storage';
+import { logger } from '@/lib/utils/logger';
 
 export const projectsService = {
   async createProject(projectData: Omit<Project, 'id'>) {
@@ -13,7 +14,7 @@ export const projectsService = {
       });
       return docRef.id;
     } catch (error) {
-      console.error('Error creating project:', error);
+      logger.error('Error creating project', error as Error);
       throw error;
     }
   },
@@ -23,7 +24,7 @@ export const projectsService = {
       const projectRef = doc(db, 'projects', projectId);
       await updateDoc(projectRef, projectData);
     } catch (error) {
-      console.error('Error updating project:', error);
+      logger.error('Error updating project', error as Error, { projectId });
       throw error;
     }
   },
@@ -45,7 +46,7 @@ export const projectsService = {
                 const imageRef = ref(storage, imageUrl);
                 await deleteObject(imageRef);
               } catch (error) {
-                console.warn('Error deleting image:', error);
+                logger.warn('Error deleting image', { imageUrl, projectId });
               }
             })
           );
@@ -56,7 +57,7 @@ export const projectsService = {
       await deleteDoc(projectRef);
       return true;
     } catch (error) {
-      console.error('Error deleting project:', error);
+      logger.error('Error deleting project', error as Error, { projectId });
       throw error;
     }
   },
@@ -73,7 +74,7 @@ export const projectsService = {
         ...doc.data()
       }));
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      logger.error('Error fetching projects', error as Error, { userId });
       throw error;
     }
   },
@@ -91,7 +92,7 @@ export const projectsService = {
       }
       return null;
     } catch (error) {
-      console.error('Error fetching project:', error);
+      logger.error('Error fetching project', error as Error, { projectId });
       throw error;
     }
   },

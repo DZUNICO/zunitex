@@ -2,6 +2,7 @@
 import { db } from './config';
 import { collection, addDoc, query, where, orderBy, getDocs, serverTimestamp, Timestamp  } from 'firebase/firestore';
 import type { Comment } from '@/types/comment';
+import { logger } from '@/lib/utils/logger';
 
 export const commentService = {
   
@@ -18,7 +19,7 @@ export const commentService = {
       });
       return docRef.id;
     } catch (error) {
-      console.error('Error adding comment:', error);
+      logger.error('Error adding comment', error as Error, { projectId: data.projectId, userId: data.userId });
       throw error;
     }
   },
@@ -43,7 +44,7 @@ export const commentService = {
         };
       }) as Comment[];
     } catch (error) {
-      console.error('Error fetching comments:', error);
+      logger.error('Error fetching comments', error as Error, { projectId });
       throw error;
     }
   }

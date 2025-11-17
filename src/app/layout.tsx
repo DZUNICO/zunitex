@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { ToastProvider } from '@/components/providers/toast-provider';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/context/auth-context';
+import { QueryProvider } from '@/lib/providers/query-provider';
 import { NavigationProgress } from '@/components/providers/navigation-progress';
 import './globals.css';
 
@@ -21,12 +22,14 @@ export default function RootLayout({
     <html lang="es">
       <body className={inter.className}>
         <NavigationProgress />
-        <AuthProvider>
-          <main className="min-h-screen bg-background">
-            {children}
-          </main>
-          <ToastProvider />
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <main className="min-h-screen bg-background">
+              {children}
+            </main>
+            <ToastProvider />
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

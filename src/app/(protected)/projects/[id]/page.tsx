@@ -1,137 +1,69 @@
 // app/(protected)/projects/[id]/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Calendar, User, ArrowLeft, Clock } from 'lucide-react';
-import type { Project } from '@/types/project';
-import { projectsService } from '@/lib/firebase/projects';
+import { MapPin, Calendar, User, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { commentService } from '@/lib/firebase/comments';
-import { useAuth } from '@/lib/context/auth-context';
-import { useToast } from '@/hooks/use-toast';  // Añadir esta importación
-import type { Comment } from '@/types/comment'; 
 import { CommentSection } from '@/components/projects/project-comment-section';
-import { UserProfile } from '@/types/profile';
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
+import { useProject } from '@/hooks/queries/use-projects';
+import { useProjectComments, useAddComment } from '@/hooks/queries/use-comments';
+import { useAuth } from '@/lib/context/auth-context';
 
 export default function ProjectDetailsPage() {
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  
-  const { toast } = useToast(); // Añadir esto
-  const { user } = useAuth();
   const { id } = useParams();
-  //cargar profile
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user?.uid) return;
-      
-      try {
-        const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          setProfile(docSnap.data() as UserProfile);
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const projectId = typeof id === 'string' ? id : undefined;
+  
+  // Usar React Query hooks
+  const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
+  const { data: comments = [], isLoading: commentsLoading } = useProjectComments(projectId);
+  const addCommentMutation = useAddComment();
+  const { user } = useAuth();
 
-    fetchProfile();
-  }, [user?.uid]);
-  //cargar proyectos
-  useEffect(() => {
-    const loadProject = async () => {
-      try {
-        if (typeof id === 'string') {
-          const data = await projectsService.getProject(id);
-          setProject(data);
-        }
-      } catch (error) {
-        console.error('Error loading project:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Memoizar el handler para evitar re-renders innecesarios
+  const handleAddComment = useMemo(
+    () => async (content: string): Promise<void> => {
+      if (!projectId) return;
+      await addCommentMutation.mutateAsync({ projectId, content });
+    },
+    [projectId, addCommentMutation]
+  );
 
-    loadProject();
-  }, [id]);
-   
-  useEffect(() => {
-    if (project?.id) {
-      loadComments();
-    }
-  }, [project?.id]);
+  // Formatear presupuesto memoizado
+  const formattedBudget = useMemo(() => {
+    if (!project?.budget) return '';
+    return new Intl.NumberFormat('es-PE', {
+      style: 'currency',
+      currency: 'PEN',
+    }).format(project.budget);
+  }, [project?.budget]);
+
+  // Formatear fecha memoizada
+  const formattedDate = useMemo(() => {
+    if (!project?.createdAt) return '';
+    return new Date(project.createdAt).toLocaleDateString('es-PE');
+  }, [project?.createdAt]);
+
+  const loading = projectLoading || commentsLoading;
 
   if (loading) {
     return <ProjectDetailsSkeleton />;
   }
-  
-  if (!project) {
+
+  if (projectError || !project) {
     return (
       <div className="container mx-auto p-4">
-        <h1>Proyecto no encontrado</h1>
+        <h1 className="text-2xl font-bold mb-4">Proyecto no encontrado</h1>
         <Link href="/projects">
           <Button>Volver a proyectos</Button>
         </Link>
       </div>
     );
   }
-
-  const loadComments = async () => {
-    if (!project?.id) return;
-
-    try {
-      const projectComments = await commentService.getProjectComments(project.id);
-      setComments(projectComments);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudieron cargar los comentarios"
-      });
-    }
-  };
-  const handleAddComment = async (content: string): Promise<void> => {
-    if (!user || !project) return;
-  
-  try {
-    await commentService.addComment({
-      projectId: project.id,
-      userId: user.uid,
-      userDisplayName: profile?.displayName || 'Usuario',
-      photoURL: profile?.photoURL || null,
-      content,
-      createdAt: new Date()
-    });
-    
-    await loadComments();
-    
-    toast({
-      title: "Comentario añadido",
-      description: "Tu comentario ha sido publicado."
-    });
-  } catch (error) {
-    console.error('Error adding comment:', error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: "No se pudo añadir el comentario"
-    });
-  }
-  };
 
   return (
     <div className="container mx-auto p-4">
@@ -188,12 +120,7 @@ export default function ProjectDetailsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Presupuesto</span>
-                <span className="text-xl font-bold">
-                  {new Intl.NumberFormat('es-PE', {
-                    style: 'currency',
-                    currency: 'PEN'
-                  }).format(project.budget)}
-                </span>
+                <span className="text-xl font-bold">{formattedBudget}</span>
               </div>
               
               <div className="flex justify-between items-center">
@@ -219,7 +146,7 @@ export default function ProjectDetailsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  <span>{new Date(project.createdAt).toLocaleDateString()}</span>
+                  <span>{formattedDate}</span>
                 </div>
               </div>
             </div>

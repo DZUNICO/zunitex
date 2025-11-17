@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
+import { logger } from '@/lib/utils/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -41,7 +42,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               }, { merge: true });
               setUser(user);
             } catch (error) {
-              console.error('Error updating last login:', error);
+              logger.error('Error updating last login', error as Error, { userId: user.uid });
             }
           } else {
             setUser(null);
@@ -52,7 +53,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         return () => unsubscribe();
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        logger.error('Error initializing auth', error as Error);
         setLoading(false);
         setAuthInitialized(true);
       }
@@ -80,7 +81,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         active: true
       });
     } catch (error) {
-      console.error('Error en registro:', error);
+      logger.error('Error en registro', error as Error, { email });
       throw error;
     }
   };
@@ -89,7 +90,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
-      console.error('Error en inicio de sesión:', error);
+      logger.error('Error en inicio de sesión', error as Error, { email });
       throw error;
     }
   };
@@ -98,7 +99,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await signOut(auth);
     } catch (error) {
-      console.error('Error en cierre de sesión:', error);
+      logger.error('Error en cierre de sesión', error as Error);
       throw error;
     }
   };

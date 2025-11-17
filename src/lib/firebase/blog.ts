@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import type { BlogPost, CreateBlogPostData } from '@/types/blog';
+import { logger } from '@/lib/utils/logger';
 
 // Helper para convertir Timestamp a Date
 const convertTimestampToDate = (timestamp: any): Date => {
@@ -52,7 +53,7 @@ export const blogService = {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(convertDocData);
     } catch (error) {
-      console.error('Error fetching published posts:', error);
+      logger.error('Error fetching published posts', error as Error);
       throw error;
     }
   },
@@ -68,7 +69,7 @@ export const blogService = {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(convertDocData);
     } catch (error) {
-      console.error('Error fetching posts:', error);
+      logger.error('Error fetching posts', error as Error);
       throw error;
     }
   },
@@ -86,7 +87,7 @@ export const blogService = {
       const docRef = await addDoc(collection(db, 'blog-posts'), postData);
       return docRef.id;
     } catch (error) {
-      console.error('Error creating post:', error);
+      logger.error('Error creating post', error as Error, { authorId: data.authorId });
       throw error;
     }
   },
@@ -105,7 +106,7 @@ export const blogService = {
       const updatedDoc = await getDoc(postRef);
       return convertDocData(updatedDoc);
     } catch (error) {
-      console.error('Error updating post:', error);
+      logger.error('Error updating post', error as Error, { postId: id });
       throw error;
     }
   },
@@ -121,7 +122,7 @@ export const blogService = {
 
       return convertDocData(docSnap);
     } catch (error) {
-      console.error('Error fetching post:', error);
+      logger.error('Error fetching post', error as Error, { postId: id });
       throw error;
     }
   },
