@@ -1,0 +1,274 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email in ['diego.zuni@gmail.com'];
+    }
+    
+    function isValidEmail(email) {
+      return email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+    
+    // ============================================================================
+    // USERS COLLECTION
+    // ============================================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == userId &&
+                       request.resource.data.keys().hasAll(['email', 'displayName', 'role', 'createdAt']) &&
+                       request.resource.data.role == 'user';
+      allow update: if isOwner(userId) &&
+                       !('role' in request.resource.data.diff(resource.data).affectedKeys()) &&
+                       !('email' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================================================
+    // PROJECTS COLLECTION
+    // ============================================================================
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.createdBy == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['title', 'description', 'status', 'category', 'budget', 'location', 'clientName', 'createdBy', 'createdAt', 'images', 'tags']) &&
+                       request.resource.data.status in ['Pendiente', 'En Progreso', 'Completado'] &&
+                       request.resource.data.category in ['Residencial', 'Comercial', 'Industrial', 'Solar'] &&
+                       request.resource.data.budget is number &&
+                       request.resource.data.budget > 0;
+      allow update: if isAuthenticated() &&
+                       (resource.data.createdBy == request.auth.uid || isAdmin()) &&
+                       !('createdBy' in request.resource.data.diff(resource.data).affectedKeys()) &&
+                       !('createdAt' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if isAuthenticated() &&
+                       (resource.data.createdBy == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================================================
+    // COMMENTS COLLECTION (Project Comments)
+    // ============================================================================
+    match /comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['projectId', 'userId', 'userDisplayName', 'content', 'createdAt']) &&
+                       request.resource.data.content is string &&
+                       request.resource.data.content.size() > 0 &&
+                       request.resource.data.content.size() <= 1000;
+      allow update: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       request.resource.data.content.size() > 0 &&
+                       request.resource.data.content.size() <= 1000;
+      allow delete: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================================================
+    // BLOG POSTS COLLECTION
+    // ============================================================================
+    match /blog-posts/{postId} {
+      allow read: if true; // Posts públicos pueden ser leídos por cualquiera
+      allow create: if isAuthenticated() &&
+                       request.resource.data.authorId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['title', 'content', 'summary', 'category', 'authorId', 'authorName', 'status', 'createdAt', 'likesCount', 'commentsCount']) &&
+                       request.resource.data.status in ['published', 'draft'] &&
+                       request.resource.data.likesCount == 0 &&
+                       request.resource.data.commentsCount == 0;
+      allow update: if isAuthenticated() &&
+                       (resource.data.authorId == request.auth.uid || isAdmin()) &&
+                       !('authorId' in request.resource.data.diff(resource.data).affectedKeys()) &&
+                       !('createdAt' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if isAuthenticated() &&
+                       (resource.data.authorId == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================================================
+    // BLOG COMMENTS COLLECTION
+    // ============================================================================
+    match /blog-comments/{commentId} {
+      allow read: if true; // Comentarios públicos
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['postId', 'userId', 'userName', 'content', 'createdAt']) &&
+                       request.resource.data.content is string &&
+                       request.resource.data.content.size() > 0 &&
+                       request.resource.data.content.size() <= 1000 &&
+                       request.resource.data.likes == 0;
+      allow update: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       request.resource.data.content.size() > 0 &&
+                       request.resource.data.content.size() <= 1000;
+      allow delete: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================================================
+    // BLOG LIKES COLLECTION
+    // ============================================================================
+    match /blog-likes/{likeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['postId', 'userId', 'createdAt']);
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // FOLLOWERS COLLECTION
+    // ============================================================================
+    match /followers/{followId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.followerId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['followerId', 'followingId', 'followerName', 'followingName', 'createdAt']) &&
+                       request.resource.data.followerId != request.resource.data.followingId; // No seguirse a sí mismo
+      allow delete: if isAuthenticated() &&
+                       resource.data.followerId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // REVIEWS COLLECTION
+    // ============================================================================
+    match /reviews/{reviewId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.reviewerId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['reviewerId', 'reviewedUserId', 'rating', 'comment', 'reviewerName', 'category', 'createdAt']) &&
+                       request.resource.data.rating in [1, 2, 3, 4, 5] &&
+                       request.resource.data.category in ['technical', 'communication', 'quality', 'punctuality'] &&
+                       request.resource.data.comment is string &&
+                       request.resource.data.comment.size() >= 10 &&
+                       request.resource.data.comment.size() <= 1000 &&
+                       request.resource.data.reviewerId != request.resource.data.reviewedUserId; // No reseñarse a sí mismo
+      allow update: if isAuthenticated() &&
+                       (resource.data.reviewerId == request.auth.uid || isAdmin()) &&
+                       request.resource.data.rating in [1, 2, 3, 4, 5] &&
+                       request.resource.data.comment.size() >= 10 &&
+                       request.resource.data.comment.size() <= 1000;
+      allow delete: if isAuthenticated() &&
+                       (resource.data.reviewerId == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================================================
+    // USER RATINGS COLLECTION (Calculated ratings)
+    // ============================================================================
+    match /user-ratings/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Solo se actualiza mediante Cloud Functions o transacciones del servidor
+    }
+    
+    // ============================================================================
+    // RESOURCES COLLECTION
+    // ============================================================================
+    match /resources/{resourceId} {
+      allow read: if isAuthenticated() && 
+                      (resource.data.isPublic == true || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['userId', 'userName', 'title', 'description', 'category', 'fileUrl', 'fileName', 'fileSize', 'fileType', 'tags', 'isPublic', 'isPremium', 'createdAt', 'downloads', 'likes', 'views']) &&
+                       request.resource.data.category in ['diagram', 'document', 'photo', 'video', 'tool', 'guide'] &&
+                       request.resource.data.downloads == 0 &&
+                       request.resource.data.likes == 0 &&
+                       request.resource.data.views == 0 &&
+                       request.resource.data.fileSize > 0 &&
+                       request.resource.data.fileSize <= 100 * 1024 * 1024; // Max 100MB
+      allow update: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       !('userId' in request.resource.data.diff(resource.data).affectedKeys()) &&
+                       !('createdAt' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================================================
+    // RESOURCE LIKES COLLECTION
+    // ============================================================================
+    match /resource-likes/{likeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['userId', 'resourceId', 'createdAt']);
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // COMMUNITY POSTS COLLECTION
+    // ============================================================================
+    match /community-posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['userId', 'userName', 'userRole', 'content', 'category', 'tags', 'createdAt', 'likes', 'commentsCount', 'views', 'isPinned']) &&
+                       request.resource.data.category in ['question', 'discussion', 'showcase', 'tip', 'news'] &&
+                       request.resource.data.userRole in ['technician', 'engineer', 'vendor', 'company'] &&
+                       request.resource.data.likes == 0 &&
+                       request.resource.data.commentsCount == 0 &&
+                       request.resource.data.views == 0 &&
+                       request.resource.data.isPinned == false;
+      allow update: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       !('userId' in request.resource.data.diff(resource.data).affectedKeys()) &&
+                       !('createdAt' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================================================
+    // POST COMMENTS COLLECTION (Community)
+    // ============================================================================
+    match /post-comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['postId', 'userId', 'userName', 'content', 'createdAt']) &&
+                       request.resource.data.content is string &&
+                       request.resource.data.content.size() > 0 &&
+                       request.resource.data.content.size() <= 1000 &&
+                       request.resource.data.likes == 0;
+      allow update: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       request.resource.data.content.size() > 0 &&
+                       request.resource.data.content.size() <= 1000;
+      allow delete: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================================================
+    // POST LIKES COLLECTION (Community)
+    // ============================================================================
+    match /post-likes/{likeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['postId', 'userId', 'createdAt']);
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // DEFAULT DENY
+    // ============================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

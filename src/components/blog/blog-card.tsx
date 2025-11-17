@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { BlogPost } from '@/types/blog';
+import { BlogLikeButton } from './blog-like-button';
+import { useMemo } from 'react';
 
 interface BlogCardProps {
   post: BlogPost;
@@ -74,14 +76,17 @@ export function BlogCard({ post, featured = false }: BlogCardProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Heart className="h-4 w-4" />
-                <span className="text-sm">{post.likesCount}</span>
-              </div>
-              <div className="flex items-center gap-1">
+            <div className="flex items-center gap-4">
+              <BlogLikeButton 
+                postId={post.id || ''} 
+                likesCount={post.likesCount || 0}
+                variant="ghost"
+                size="sm"
+                showCount={true}
+              />
+              <div className="flex items-center gap-1 text-muted-foreground">
                 <MessageSquare className="h-4 w-4" />
-                <span className="text-sm">{post.commentsCount}</span>
+                <span className="text-sm">{post.commentsCount || 0}</span>
               </div>
             </div>
           </div>

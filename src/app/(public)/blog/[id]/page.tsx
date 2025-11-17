@@ -1,7 +1,5 @@
 'use client';
 
-import { blogService } from '@/lib/firebase/blog';
-import { notFound } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -9,11 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import type { BlogPost } from '@/types/blog';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/context/auth-context';
+import { useBlogPost } from '@/lib/react-query/queries';
+import { BlogCommentSection } from '@/components/blog/blog-comment-section';
+import { BlogLikeButton } from '@/components/blog/blog-like-button';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
 // Importar el editor y el visor de Markdown dinámicamente
@@ -29,58 +29,46 @@ const MDMarkdown = dynamic(
 
 export default function BlogPostPage() {
   const { user } = useAuth();
-  const router = useRouter();
-  const [post, setPost] = useState<BlogPost | null>(null);
-  const [editedPost, setEditedPost] = useState<Partial<BlogPost>>({});
-  const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
   const params = useParams();
+  const postId = typeof params.id === 'string' ? params.id : undefined;
+  
+  const { data: post, isLoading, error } = useBlogPost(postId);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedPost, setEditedPost] = useState<Partial<typeof post>>({});
 
+  // Inicializar editedPost cuando el post se carga
   useEffect(() => {
-    const loadPost = async () => {
-      try {
-        if (typeof params.id === 'string') {
-          const data = await blogService.getPostById(params.id);
-          setPost(data);
-          if (data) {
-            setEditedPost({
-              title: data.title,
-              content: data.content,
-              category: data.category,
-              status: data.status
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error loading post:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPost();
-  }, [params.id]);
-
-  const handleSave = async () => {
-    try {
-      if (!post || !editedPost) return;
-      setLoading(true);
-      await blogService.updatePost(params.id as string, editedPost);
-      setPost({ ...post, ...editedPost });
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating post:', error);
-    } finally {
-      setLoading(false);
+    if (post && !editedPost.title) {
+      setEditedPost({
+        title: post.title,
+        content: post.content,
+        category: post.category,
+        status: post.status
+      });
     }
-  };
+  }, [post]);
 
-  if (loading) {
-    return <div>Cargando...</div>;
+  if (isLoading) {
+    return (
+      <div className="container max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Cargando post...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (!post) {
-    return notFound();
+  if (error || !post) {
+    return (
+      <div className="container max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold mb-4">Post no encontrado</h1>
+          <Link href="/blog">
+            <Button>Volver al blog</Button>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const createdAt = post.createdAt instanceof Date 
@@ -178,13 +166,28 @@ export default function BlogPostPage() {
           <h1 className="text-4xl font-bold">{post.title}</h1>
         )}
         
-        <div className="flex items-center gap-3 py-4 border-b">
-          <Avatar>
-            <AvatarImage src={post.authorPhotoURL || undefined} />
-            <AvatarFallback>{post.authorName[0]}</AvatarFallback>
-          </Avatar>
-          <div>
-            <div className="font-medium">{post.authorName}</div>
+        <div className="flex items-center justify-between py-4 border-b">
+          <div className="flex items-center gap-3">
+            <Avatar>
+              <AvatarImage src={post.authorPhotoURL || undefined} />
+              <AvatarFallback>{post.authorName[0]}</AvatarFallback>
+            </Avatar>
+            <div>
+              <div className="font-medium">{post.authorName}</div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <BlogLikeButton 
+              postId={post.id || ''} 
+              likesCount={post.likesCount || 0}
+              variant="ghost"
+              size="sm"
+            />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MessageSquare className="h-4 w-4" />
+              <span>{post.commentsCount || 0}</span>
+            </div>
           </div>
         </div>
 
@@ -207,6 +210,11 @@ export default function BlogPostPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Sección de comentarios */}
+      <div className="mt-12 pt-8 border-t">
+        <BlogCommentSection postId={post.id || ''} />
       </div>
     </article>
   );

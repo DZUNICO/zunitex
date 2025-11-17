@@ -18,9 +18,12 @@ import { getFirebaseErrorMessage } from '@/lib/utils/logger';
 import { projectsService } from '@/lib/firebase/projects';
 import { commentService } from '@/lib/firebase/comments';
 import { blogService } from '@/lib/firebase/blog';
+import { blogCommentsService } from '@/lib/firebase/blog-comments';
+import { blogLikesService } from '@/lib/firebase/blog-likes';
 import { followersService } from '@/lib/firebase/followers';
 import { resourcesService } from '@/lib/firebase/resources';
 import { reviewsService } from '@/lib/firebase/reviews';
+import { communityService } from '@/lib/firebase/community';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
@@ -28,10 +31,12 @@ import { db } from '@/lib/firebase/config';
 import type { Project, CreateProjectData } from '@/types/project';
 import type { Comment } from '@/types/comment';
 import type { BlogPost, CreateBlogPostData } from '@/types/blog';
+import type { BlogComment } from '@/lib/firebase/blog-comments';
 import type { UserProfile } from '@/types/profile';
-import type { Follower } from '@/lib/firebase/followers';
-import type { Resource } from '@/lib/firebase/resources';
-import type { Review } from '@/lib/firebase/reviews';
+import type { Follower } from '@/types/followers';
+import type { Resource, ResourceFilters } from '@/types/resources';
+import type { Review, ReviewFilters } from '@/types/reviews';
+import type { CommunityPost, PostComment, CommunityFilters } from '@/types/community';
 import type { QueryDocumentSnapshot } from 'firebase/firestore';
 
 // ============================================================================
@@ -57,6 +62,21 @@ export const queryKeys = {
     list: (filters?: BlogFilters) => [...queryKeys.blog.lists(), filters] as const,
     details: () => [...queryKeys.blog.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.blog.details(), id] as const,
+    comments: () => [...queryKeys.blog.all, 'comments'] as const,
+    commentsList: (postId: string) => [...queryKeys.blog.comments(), postId] as const,
+    likes: () => [...queryKeys.blog.all, 'likes'] as const,
+    likeStatus: (postId: string, userId: string) => [...queryKeys.blog.likes(), postId, userId] as const,
+  },
+  community: {
+    all: ['community'] as const,
+    lists: () => [...queryKeys.community.all, 'list'] as const,
+    list: (filters?: CommunityFilters) => [...queryKeys.community.lists(), filters] as const,
+    details: () => [...queryKeys.community.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.community.details(), id] as const,
+    comments: () => [...queryKeys.community.all, 'comments'] as const,
+    commentsList: (postId: string) => [...queryKeys.community.comments(), postId] as const,
+    likes: () => [...queryKeys.community.all, 'likes'] as const,
+    likeStatus: (postId: string, userId: string) => [...queryKeys.community.likes(), postId, userId] as const,
   },
   profile: {
     all: ['profile'] as const,
@@ -110,6 +130,10 @@ export interface ResourceFilters {
 export interface ReviewFilters {
   userId?: string;
   projectId?: string;
+  reviewedUserId?: string;
+  reviewerId?: string;
+  category?: string;
+  minRating?: number;
 }
 
 // ============================================================================
@@ -512,6 +536,187 @@ export function useBlogPosts(filters?: BlogFilters) {
 }
 
 /**
+ * Hook para obtener comentarios de un post del blog
+ */
+export function useBlogComments(postId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.blog.commentsList(postId || ''),
+    queryFn: async () => {
+      if (!postId) {
+        throw new Error('ID de post requerido');
+      }
+
+      logger.debug('Fetching blog comments', { postId });
+      return await blogCommentsService.getPostComments(postId);
+    },
+    enabled: !!postId,
+    staleTime: 2 * 60 * 1000, // 2 minutos
+  });
+}
+
+/**
+ * Hook para agregar comentario a un post del blog
+ */
+export function useAddBlogComment() {
+  const { user } = useAuth();
+  const { data: profile } = useUserProfile();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ postId, content, parentId }: { postId: string; content: string; parentId?: string }) => {
+      if (!user?.uid) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      logger.info('Adding blog comment', { postId, userId: user.uid });
+      
+      return await blogCommentsService.addComment({
+        postId,
+        userId: user.uid,
+        userName: profile?.displayName || user.displayName || 'Usuario',
+        userAvatar: profile?.photoURL || user.photoURL || null,
+        content,
+        parentId,
+      });
+    },
+    onMutate: async ({ postId, content, parentId }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.blog.commentsList(postId) });
+
+      const previousComments = queryClient.getQueryData<BlogComment[]>(
+        queryKeys.blog.commentsList(postId)
+      );
+
+      if (previousComments && user?.uid && profile) {
+        const optimisticComment: BlogComment = {
+          id: 'temp-' + Date.now(),
+          postId,
+          userId: user.uid,
+          userName: profile.displayName || 'Usuario',
+          userAvatar: profile.photoURL || undefined,
+          content,
+          parentId,
+          likes: 0,
+          createdAt: new Date(),
+        };
+
+        queryClient.setQueryData<BlogComment[]>(
+          queryKeys.blog.commentsList(postId),
+          [...previousComments, optimisticComment]
+        );
+      }
+
+      return { previousComments };
+    },
+    onError: (error, variables, context) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(
+          queryKeys.blog.commentsList(variables.postId),
+          context.previousComments
+        );
+      }
+      logger.error('Error adding blog comment', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.blog.commentsList(variables.postId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.blog.detail(variables.postId) });
+      toast({
+        title: 'Comentario añadido',
+        description: 'Tu comentario ha sido publicado.',
+      });
+    },
+  });
+}
+
+/**
+ * Hook para verificar si un post del blog está liked
+ */
+export function useIsBlogPostLiked(postId: string | undefined) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: queryKeys.blog.likeStatus(postId || '', user?.uid || ''),
+    queryFn: async () => {
+      if (!postId || !user?.uid) {
+        return false;
+      }
+
+      return await blogLikesService.isPostLiked(user.uid, postId);
+    },
+    enabled: !!postId && !!user?.uid,
+    staleTime: 2 * 60 * 1000, // 2 minutos
+  });
+}
+
+/**
+ * Hook para dar like/unlike a un post del blog
+ */
+export function useLikeBlogPost() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ postId, like }: { postId: string; like: boolean }) => {
+      if (!user?.uid) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      if (like) {
+        await blogLikesService.likePost(user.uid, postId);
+      } else {
+        await blogLikesService.unlikePost(user.uid, postId);
+      }
+      return { postId, like };
+    },
+    onMutate: async ({ postId, like }) => {
+      await queryClient.cancelQueries({ 
+        queryKey: queryKeys.blog.likeStatus(postId, user?.uid || '') 
+      });
+
+      const previousStatus = queryClient.getQueryData<boolean>(
+        queryKeys.blog.likeStatus(postId, user?.uid || '')
+      );
+
+      // Optimistic update
+      queryClient.setQueryData(
+        queryKeys.blog.likeStatus(postId, user?.uid || ''),
+        like
+      );
+
+      return { previousStatus };
+    },
+    onError: (error, variables, context) => {
+      if (context?.previousStatus !== undefined) {
+        queryClient.setQueryData(
+          queryKeys.blog.likeStatus(variables.postId, user?.uid || ''),
+          context.previousStatus
+        );
+      }
+      logger.error('Error liking/unliking blog post', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: queryKeys.blog.likeStatus(variables.postId, user?.uid || '') 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: queryKeys.blog.detail(variables.postId) 
+      });
+    },
+  });
+}
+
+/**
  * Hook para obtener un post específico
  */
 export function useBlogPost(postId: string | undefined) {
@@ -783,13 +988,49 @@ export function useResources(filters?: ResourceFilters) {
       return await resourcesService.getResources({
         limit: 10,
         cursor: pageParam as QueryDocumentSnapshot | null,
-        ...filters,
+        filters,
       });
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: null as QueryDocumentSnapshot | null,
     staleTime: 5 * 60 * 1000, // 5 minutos
     gcTime: 15 * 60 * 1000, // 15 minutos en caché
+  });
+}
+
+/**
+ * Hook para dar like/unlike a un recurso
+ */
+export function useLikeResource() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ resourceId, like }: { resourceId: string; like: boolean }) => {
+      if (!user?.uid) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      if (like) {
+        await resourcesService.likeResource(user.uid, resourceId);
+      } else {
+        await resourcesService.unlikeResource(user.uid, resourceId);
+      }
+      return { resourceId, like };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.detail(variables.resourceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.lists() });
+    },
+    onError: (error) => {
+      logger.error('Error liking/unliking resource', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
   });
 }
 
@@ -833,13 +1074,76 @@ export function useReviews(filters?: ReviewFilters) {
       return await reviewsService.getReviews({
         limit: 10,
         cursor: pageParam as QueryDocumentSnapshot | null,
-        ...filters,
+        filters,
       });
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: null as QueryDocumentSnapshot | null,
     staleTime: 3 * 60 * 1000, // 3 minutos - reviews pueden cambiar
     gcTime: 10 * 60 * 1000, // 10 minutos en caché
+  });
+}
+
+/**
+ * Hook para crear una review
+ */
+export function useCreateReview() {
+  const { user } = useAuth();
+  const { data: profile } = useUserProfile();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: Omit<Review, 'id' | 'createdAt' | 'updatedAt' | 'reviewerName' | 'reviewerAvatar'>) => {
+      if (!user?.uid) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      return await reviewsService.createReview({
+        ...data,
+        reviewerId: user.uid,
+        reviewerName: profile?.displayName || user.displayName || 'Usuario',
+        reviewerAvatar: profile?.photoURL || user.photoURL || null,
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reviews.lists() });
+      if (variables.reviewedUserId) {
+        queryClient.invalidateQueries({ 
+          queryKey: queryKeys.reviews.list({ reviewedUserId: variables.reviewedUserId }) 
+        });
+      }
+      toast({
+        title: 'Reseña creada',
+        description: 'Tu reseña ha sido publicada exitosamente.',
+      });
+    },
+    onError: (error) => {
+      logger.error('Error creating review', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Hook para obtener el rating de un usuario
+ */
+export function useUserRating(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['user-rating', userId],
+    queryFn: async () => {
+      if (!userId) {
+        throw new Error('ID de usuario requerido');
+      }
+
+      return await reviewsService.getUserRating(userId);
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000, // 5 minutos
   });
 }
 
@@ -865,6 +1169,240 @@ export function useReview(reviewId: string | undefined) {
     },
     enabled: !!reviewId,
     staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+}
+
+// ============================================================================
+// COMMUNITY QUERIES
+// ============================================================================
+
+/**
+ * Hook para obtener posts de comunidad con paginación infinita
+ */
+export function useCommunityPosts(filters?: CommunityFilters) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.community.list(filters),
+    queryFn: async ({ pageParam = null }) => {
+      logger.debug('Fetching community posts page', { filters, pageParam: !!pageParam });
+      return await communityService.getPosts({
+        limit: 10,
+        cursor: pageParam as QueryDocumentSnapshot | null,
+        filters,
+      });
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    initialPageParam: null as QueryDocumentSnapshot | null,
+    staleTime: 3 * 60 * 1000, // 3 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos en caché
+  });
+}
+
+/**
+ * Hook para obtener un post de comunidad específico
+ */
+export function useCommunityPost(postId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.community.detail(postId || ''),
+    queryFn: async () => {
+      if (!postId) {
+        throw new Error('ID de post requerido');
+      }
+
+      logger.debug('Fetching community post', { postId });
+      const post = await communityService.getPost(postId);
+      
+      if (!post) {
+        throw new Error('Post no encontrado');
+      }
+      
+      return post;
+    },
+    enabled: !!postId,
+    staleTime: 3 * 60 * 1000, // 3 minutos
+  });
+}
+
+/**
+ * Hook para crear un post de comunidad
+ */
+export function useCreateCommunityPost() {
+  const { user } = useAuth();
+  const { data: profile } = useUserProfile();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: Omit<CommunityPost, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'commentsCount' | 'views' | 'userId' | 'userName' | 'userAvatar'>) => {
+      if (!user?.uid) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      return await communityService.createPost({
+        ...data,
+        userId: user.uid,
+        userName: profile?.displayName || user.displayName || 'Usuario',
+        userAvatar: profile?.photoURL || user.photoURL || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.lists() });
+      toast({
+        title: 'Post creado',
+        description: 'Tu post ha sido publicado exitosamente.',
+      });
+    },
+    onError: (error) => {
+      logger.error('Error creating community post', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Hook para obtener comentarios de un post de comunidad
+ */
+export function useCommunityPostComments(postId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.community.commentsList(postId || ''),
+    queryFn: async () => {
+      if (!postId) {
+        throw new Error('ID de post requerido');
+      }
+
+      logger.debug('Fetching community post comments', { postId });
+      return await communityService.getPostComments(postId);
+    },
+    enabled: !!postId,
+    staleTime: 2 * 60 * 1000, // 2 minutos
+  });
+}
+
+/**
+ * Hook para agregar comentario a un post de comunidad
+ */
+export function useAddCommunityComment() {
+  const { user } = useAuth();
+  const { data: profile } = useUserProfile();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ postId, content }: { postId: string; content: string }) => {
+      if (!user?.uid) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      return await communityService.addPostComment({
+        postId,
+        userId: user.uid,
+        userName: profile?.displayName || user.displayName || 'Usuario',
+        userAvatar: profile?.photoURL || user.photoURL || undefined,
+        content,
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.commentsList(variables.postId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.detail(variables.postId) });
+      toast({
+        title: 'Comentario añadido',
+        description: 'Tu comentario ha sido publicado.',
+      });
+    },
+    onError: (error) => {
+      logger.error('Error adding community comment', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Hook para verificar si un post de comunidad está liked
+ */
+export function useIsCommunityPostLiked(postId: string | undefined) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: queryKeys.community.likeStatus(postId || '', user?.uid || ''),
+    queryFn: async () => {
+      if (!postId || !user?.uid) {
+        return false;
+      }
+
+      return await communityService.isPostLiked(user.uid, postId);
+    },
+    enabled: !!postId && !!user?.uid,
+    staleTime: 2 * 60 * 1000, // 2 minutos
+  });
+}
+
+/**
+ * Hook para dar like/unlike a un post de comunidad
+ */
+export function useLikeCommunityPost() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ postId, like }: { postId: string; like: boolean }) => {
+      if (!user?.uid) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      if (like) {
+        await communityService.likePost(user.uid, postId);
+      } else {
+        await communityService.unlikePost(user.uid, postId);
+      }
+      return { postId, like };
+    },
+    onMutate: async ({ postId, like }) => {
+      await queryClient.cancelQueries({ 
+        queryKey: queryKeys.community.likeStatus(postId, user?.uid || '') 
+      });
+
+      const previousStatus = queryClient.getQueryData<boolean>(
+        queryKeys.community.likeStatus(postId, user?.uid || '')
+      );
+
+      // Optimistic update
+      queryClient.setQueryData(
+        queryKeys.community.likeStatus(postId, user?.uid || ''),
+        like
+      );
+
+      return { previousStatus };
+    },
+    onError: (error, variables, context) => {
+      if (context?.previousStatus !== undefined) {
+        queryClient.setQueryData(
+          queryKeys.community.likeStatus(variables.postId, user?.uid || ''),
+          context.previousStatus
+        );
+      }
+      logger.error('Error liking/unliking community post', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: queryKeys.community.likeStatus(variables.postId, user?.uid || '') 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: queryKeys.community.detail(variables.postId) 
+      });
+    },
   });
 }
 
