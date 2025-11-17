@@ -10,22 +10,25 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Tiempo de caché: 5 minutos
-            staleTime: 1000 * 60 * 5,
-            // Tiempo de caché en memoria: 10 minutos
-            gcTime: 1000 * 60 * 10,
+            // Configuración por defecto para queries
+            staleTime: 5 * 60 * 1000, // 5 minutos - datos relativamente estáticos
+            gcTime: 10 * 60 * 1000, // 10 minutos en caché (antes cacheTime)
             // Reintentar 3 veces en caso de error
             retry: 3,
-            // Tiempo entre reintentos: 1 segundo
-            retryDelay: 1000,
-            // Refetch cuando la ventana recupera el foco
+            // Tiempo entre reintentos: exponencial backoff
+            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+            // NO refetch cuando la ventana recupera el foco (datos estáticos)
             refetchOnWindowFocus: false,
-            // No refetch al reconectar
+            // Refetch al reconectar (importante para datos que pueden cambiar)
             refetchOnReconnect: true,
+            // NO refetch al montar si los datos están frescos
+            refetchOnMount: true,
           },
           mutations: {
-            // Reintentar 1 vez en mutaciones
+            // Reintentar 1 vez en mutaciones (operaciones de escritura)
             retry: 1,
+            // Tiempo entre reintentos en mutaciones
+            retryDelay: 1000,
           },
         },
       })
@@ -34,7 +37,13 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools 
+          initialIsOpen={false} 
+          position="bottom-right"
+          buttonPosition="bottom-right"
+        />
+      )}
     </QueryClientProvider>
   );
 }

@@ -13,7 +13,7 @@ import {
   useCreateProject, 
   useUpdateProject, 
   useDeleteProject 
-} from '@/hooks/queries/use-projects';
+} from '@/lib/react-query/queries';
 
 export default function ProjectsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

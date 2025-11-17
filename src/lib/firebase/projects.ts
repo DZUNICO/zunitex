@@ -1,6 +1,20 @@
 
 import { db, storage } from './config';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs,getDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  getDocs,
+  getDoc,
+  orderBy,
+  limit,
+  startAfter,
+  QueryDocumentSnapshot
+} from 'firebase/firestore';
 import type { Project } from '@/types/project';
 import { deleteObject, ref } from 'firebase/storage';
 import { logger } from '@/lib/utils/logger';
@@ -66,7 +80,8 @@ export const projectsService = {
     try {
       const q = query(
         collection(db, 'projects'),
-        where('createdBy', '==', userId)
+        where('createdBy', '==', userId),
+        orderBy('createdAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => ({
@@ -75,6 +90,60 @@ export const projectsService = {
       }));
     } catch (error) {
       logger.error('Error fetching projects', error as Error, { userId });
+      throw error;
+    }
+  },
+
+  async getProjects(
+    options: {
+      limit?: number;
+      cursor?: QueryDocumentSnapshot | null;
+      userId?: string;
+      status?: string;
+      category?: string;
+    } = {}
+  ): Promise<{ projects: Project[]; nextCursor: QueryDocumentSnapshot | null; hasMore: boolean }> {
+    try {
+      const { limit: pageLimit = 10, cursor, userId, status, category } = options;
+      
+      let q = query(
+        collection(db, 'projects'),
+        orderBy('createdAt', 'desc')
+      );
+
+      if (userId) {
+        q = query(q, where('createdBy', '==', userId));
+      }
+      if (status) {
+        q = query(q, where('status', '==', status));
+      }
+      if (category) {
+        q = query(q, where('category', '==', category));
+      }
+
+      q = query(q, limit(pageLimit + 1)); // +1 para saber si hay más páginas
+      
+      if (cursor) {
+        q = query(q, startAfter(cursor));
+      }
+
+      const snapshot = await getDocs(q);
+      const docs = snapshot.docs;
+      const hasMore = docs.length > pageLimit;
+      const projects = (hasMore ? docs.slice(0, pageLimit) : docs).map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        images: doc.data().images || [],
+        tags: doc.data().tags || [],
+      })) as Project[];
+
+      return {
+        projects,
+        nextCursor: hasMore ? docs[pageLimit] : null,
+        hasMore,
+      };
+    } catch (error) {
+      logger.error('Error fetching projects', error as Error);
       throw error;
     }
   },

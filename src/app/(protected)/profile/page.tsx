@@ -3,7 +3,7 @@
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileTabs } from "@/components/profile/profile-tabs";
 import { Loader2 } from "lucide-react";
-import { useUserProfile } from '@/hooks/queries/use-profile';
+import { useUserProfile } from '@/lib/react-query/queries';
 import { transformUserToProfileHeader } from '@/types/profile';
 
 export default function ProfilePage() {

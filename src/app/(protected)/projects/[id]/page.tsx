@@ -10,8 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin, Calendar, User, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { CommentSection } from '@/components/projects/project-comment-section';
-import { useProject } from '@/hooks/queries/use-projects';
-import { useProjectComments, useAddComment } from '@/hooks/queries/use-comments';
+import { useProject, useAddComment, useProjectComments } from '@/lib/react-query/queries';
 import { useAuth } from '@/lib/context/auth-context';
 
 export default function ProjectDetailsPage() {
