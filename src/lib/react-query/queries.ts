@@ -1406,3 +1406,126 @@ export function useLikeCommunityPost() {
   });
 }
 
+/**
+ * Hook para actualizar un post de comunidad
+ */
+export function useUpdateCommunityPost() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ postId, data }: { postId: string; data: Partial<CommunityPost> }) => {
+      logger.info('Updating community post', { postId });
+      await communityService.updatePost(postId, data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.detail(variables.postId) });
+      toast({
+        title: 'Post actualizado',
+        description: 'Los cambios han sido guardados exitosamente.',
+      });
+    },
+    onError: (error) => {
+      logger.error('Error updating community post', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Hook para eliminar un post de comunidad
+ */
+export function useDeleteCommunityPost() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      logger.info('Deleting community post', { postId });
+      await communityService.deletePost(postId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.lists() });
+      toast({
+        title: 'Post eliminado',
+        description: 'El post ha sido eliminado exitosamente.',
+      });
+    },
+    onError: (error) => {
+      logger.error('Error deleting community post', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Hook para actualizar un comentario de post
+ */
+export function useUpdateCommunityComment() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ commentId, content, postId }: { commentId: string; content: string; postId: string }) => {
+      logger.info('Updating community comment', { commentId });
+      await communityService.updatePostComment(commentId, content);
+      return { commentId, postId };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.commentsList(variables.postId) });
+      toast({
+        title: 'Comentario actualizado',
+        description: 'El comentario ha sido actualizado exitosamente.',
+      });
+    },
+    onError: (error) => {
+      logger.error('Error updating community comment', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+  });
+}
+
+/**
+ * Hook para eliminar un comentario de post
+ */
+export function useDeleteCommunityComment() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ commentId, postId }: { commentId: string; postId: string }) => {
+      logger.info('Deleting community comment', { commentId });
+      await communityService.deletePostComment(commentId, postId);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.commentsList(variables.postId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.detail(variables.postId) });
+      toast({
+        title: 'Comentario eliminado',
+        description: 'El comentario ha sido eliminado exitosamente.',
+      });
+    },
+    onError: (error) => {
+      logger.error('Error deleting community comment', error as Error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: getFirebaseErrorMessage(error),
+      });
+    },
+  });
+}
+
