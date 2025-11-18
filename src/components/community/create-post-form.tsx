@@ -13,8 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCreateCommunityPost } from '@/lib/react-query/queries';
+import { useCreateCommunityPost, useUserProfile } from '@/lib/react-query/queries';
 import { useAuth } from '@/lib/context/auth-context';
+import type { PostCategory } from '@/types/community';
 import { Image as ImageIcon, X, Send, Hash, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -33,6 +34,7 @@ const categories = [
 
 export function CreatePostForm({ onSuccess }: { onSuccess?: () => void }) {
   const { user } = useAuth();
+  const { data: profile } = useUserProfile();
   const { toast } = useToast();
   const createPostMutation = useCreateCommunityPost();
   
@@ -139,10 +141,11 @@ export function CreatePostForm({ onSuccess }: { onSuccess?: () => void }) {
     try {
       await createPostMutation.mutateAsync({
         content: content.trim(),
-        category: category as 'question' | 'discussion' | 'showcase' | 'tip' | 'news',
+        category: category as PostCategory,
         tags,
         images: images.length > 0 ? images : undefined,
-        userRole: 'technician', // Por defecto, se puede obtener del perfil
+        userRole: 'technician', // Valor por defecto, ya que profile.role es 'admin' | 'user' y no coincide con UserRole
+        isPinned: false,
       });
 
       // Reset form
@@ -150,12 +153,9 @@ export function CreatePostForm({ onSuccess }: { onSuccess?: () => void }) {
       setCategory('discussion');
       setTags([]);
       setImages([]);
+      setIsExpanded(false);
       
-      toast({
-        title: 'Post creado',
-        description: 'Tu post ha sido publicado exitosamente.',
-      });
-
+      // El toast de éxito ya se maneja en el hook useCreateCommunityPost
       onSuccess?.();
     } catch (error) {
       // Error manejado en el hook

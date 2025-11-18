@@ -140,8 +140,13 @@ export const communityService = {
 
   async createPost(data: Omit<CommunityPost, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'commentsCount' | 'views'>): Promise<string> {
     try {
+      // Filtrar campos undefined ya que Firebase no los acepta
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+      
       const docRef = await addDoc(collection(db, 'community-posts'), {
-        ...data,
+        ...cleanData,
         likes: 0,
         commentsCount: 0,
         views: 0,
@@ -157,9 +162,14 @@ export const communityService = {
 
   async updatePost(postId: string, data: Partial<CommunityPost>): Promise<void> {
     try {
+      // Filtrar campos undefined ya que Firebase no los acepta
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+      
       const docRef = doc(db, 'community-posts', postId);
       await updateDoc(docRef, {
-        ...data,
+        ...cleanData,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
@@ -318,8 +328,13 @@ export const communityService = {
 
   async addPostComment(data: Omit<PostComment, 'id' | 'createdAt' | 'likes'>): Promise<string> {
     try {
+      // Filtrar campos undefined ya que Firebase no los acepta
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+      
       const commentRef = await addDoc(collection(db, 'post-comments'), {
-        ...data,
+        ...cleanData,
         likes: 0,
         createdAt: serverTimestamp(),
       });
