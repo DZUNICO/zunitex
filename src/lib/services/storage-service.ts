@@ -12,17 +12,28 @@ export const storageService = {
         throw new Error('La imagen no debe superar los 5MB');
       }
 
-      // Eliminar imagen anterior si existe
-      const oldImageRef = ref(storage, `profiles/${userId}/profile.${file.type.split('/')[1]}`);
-      try {
-        await deleteObject(oldImageRef);
-      } catch (error) {
-        // Ignorar error si no existe imagen anterior
+      // Obtener la extensión real del archivo (más confiable que derivar del MIME type)
+      const fileName = file.name;
+      const fileExt = fileName.includes('.') 
+        ? fileName.split('.').pop()?.toLowerCase() || 'jpg'
+        : file.type.split('/')[1] || 'jpg';
+      
+      // Normalizar extensiones comunes
+      const normalizedExt = fileExt === 'jpeg' ? 'jpg' : fileExt;
+
+      // Eliminar imagen anterior si existe (buscar cualquier extensión común)
+      const commonExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'];
+      for (const ext of commonExtensions) {
+        try {
+          const oldImageRef = ref(storage, `profiles/${userId}/profile.${ext}`);
+          await deleteObject(oldImageRef);
+        } catch (error) {
+          // Ignorar error si no existe imagen anterior
+        }
       }
 
       // Subir nueva imagen
-      const fileExt = file.type.split('/')[1];
-      const storageRef = ref(storage, `profiles/${userId}/profile.${fileExt}`);
+      const storageRef = ref(storage, `profiles/${userId}/profile.${normalizedExt}`);
       
       const metadata = {
         contentType: file.type,

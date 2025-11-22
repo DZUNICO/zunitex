@@ -6,7 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/context/auth-context';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { logger } from '@/lib/utils/logger';
 import type { Comment } from '@/types/comment'; // Asegúrate de tener este archivo
+import Link from 'next/link';
 
 interface CommentSectionProps {
   projectId: string;
@@ -72,13 +74,25 @@ export function CommentSection({
       <div className="space-y-4">
         {comments.map((comment) => (
           <div key={comment.id} className="flex gap-4">
-            <Avatar>
-              <AvatarImage src={comment.photoURL|| undefined} alt={comment.userDisplayName} />
-              <AvatarFallback>{comment.userDisplayName[0]}</AvatarFallback>
-            </Avatar>
+            {/* Avatar clickeable para ir al perfil */}
+            <Link 
+              href={`/profile/${comment.userId}`}
+              className="hover:opacity-80 transition-opacity"
+            >
+              <Avatar className="cursor-pointer">
+                <AvatarImage src={comment.photoURL|| undefined} alt={comment.userDisplayName} />
+                <AvatarFallback>{comment.userDisplayName[0]}</AvatarFallback>
+              </Avatar>
+            </Link>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className="font-semibold">{comment.userDisplayName}</span>
+                {/* Nombre clickeable para ir al perfil */}
+                <Link 
+                  href={`/profile/${comment.userId}`}
+                  className="font-semibold hover:text-primary transition-colors cursor-pointer"
+                >
+                  {comment.userDisplayName}
+                </Link>
                 <span className="text-sm text-muted-foreground">
                   {formatCommentDate(comment.createdAt)}
                 </span>

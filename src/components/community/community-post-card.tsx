@@ -14,6 +14,33 @@ import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/types/community';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { Timestamp } from 'firebase/firestore';
+
+// Componente para hacer clickeable el contenido del post sin usar Link anidado
+const ClickablePostContent = ({ postId, children }: { postId: string; children: React.ReactNode }) => {
+  const router = useRouter();
+  
+  const handleClick = () => {
+    router.push(`/community/${postId}`);
+  };
+
+  return (
+    <div 
+      onClick={handleClick}
+      className="cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+};
 
 interface CommunityPostCardProps {
   post: CommunityPost;
@@ -31,6 +58,37 @@ export function CommunityPostCard({ post }: CommunityPostCardProps) {
   const { user } = useAuth();
   const { data: isLiked = false } = useIsCommunityPostLiked(post.id);
   const likeMutation = useLikeCommunityPost();
+
+  /**
+   * Función helper para convertir diferentes tipos de fechas a Date
+   * Maneja: Date, string, Timestamp de Firestore, y objetos con seconds/nanoseconds
+   */
+  const convertToDate = (date: any): Date => {
+    // Si es un Timestamp de Firestore con método toDate
+    if (date && typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+      return date.toDate();
+    }
+    // Si es un objeto con seconds (Timestamp serializado)
+    if (date && typeof date === 'object' && ('seconds' in date || '_seconds' in date)) {
+      const seconds = date.seconds || date._seconds || 0;
+      const nanoseconds = date.nanoseconds || date._nanoseconds || 0;
+      return new Timestamp(seconds, nanoseconds).toDate();
+    }
+    // Si ya es un Date
+    if (date instanceof Date) {
+      return date;
+    }
+    // Si es un string
+    if (typeof date === 'string') {
+      return new Date(date);
+    }
+    // Si es un número (timestamp)
+    if (typeof date === 'number') {
+      return new Date(date);
+    }
+    // Fallback: fecha actual
+    return new Date();
+  };
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -93,20 +151,32 @@ export function CommunityPostCard({ post }: CommunityPostCardProps) {
 
         {/* Contenido principal */}
         <div className="flex-1">
-          <Link href={`/community/${post.id}`} className="block">
+          <ClickablePostContent postId={post.id || ''}>
             <div className="p-4 hover:bg-gray-50/50 transition-colors">
               {/* Header con usuario y metadata */}
               <div className="flex items-center gap-2 mb-3">
-                <Avatar className="h-7 w-7 border border-gray-200">
-                  <AvatarImage src={post.userAvatar} alt={post.userName} />
-                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
+                {/* Avatar clickeable para ir al perfil */}
+                <Link 
+                  href={`/profile/${post.userId}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="hover:opacity-80 transition-opacity"
+                >
+                  <Avatar className="h-7 w-7 border border-gray-200 cursor-pointer">
+                    <AvatarImage src={post.userAvatar} alt={post.userName} />
+                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-sm font-semibold text-gray-900 truncate">
+                  {/* Nombre clickeable para ir al perfil */}
+                  <Link 
+                    href={`/profile/${post.userId}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-sm font-semibold text-gray-900 truncate hover:text-primary transition-colors cursor-pointer"
+                  >
                     {post.userName}
-                  </span>
+                  </Link>
                   <span className="text-xs text-gray-400">•</span>
                   <Badge 
                     variant="secondary" 
@@ -124,7 +194,7 @@ export function CommunityPostCard({ post }: CommunityPostCardProps) {
                     </>
                   )}
                   <span className="text-xs text-gray-400 ml-auto whitespace-nowrap">
-                    {formatDistanceToNow(new Date(post.createdAt), {
+                    {formatDistanceToNow(convertToDate(post.createdAt), {
                       addSuffix: true,
                       locale: es,
                     })}
@@ -198,7 +268,7 @@ export function CommunityPostCard({ post }: CommunityPostCardProps) {
                 </div>
               </div>
             </div>
-          </Link>
+          </ClickablePostContent>
         </div>
       </div>
     </Card>

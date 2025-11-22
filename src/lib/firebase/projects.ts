@@ -84,10 +84,16 @@ export const projectsService = {
         orderBy('createdAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Convertir Timestamp de Firestore a Date
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt || Date.now())),
+          startDate: data.startDate?.toDate ? data.startDate.toDate() : (data.startDate instanceof Date ? data.startDate : data.startDate ? new Date(data.startDate) : undefined)
+        };
+      });
     } catch (error) {
       logger.error('Error fetching projects', error as Error, { userId });
       throw error;

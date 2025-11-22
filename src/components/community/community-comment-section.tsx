@@ -11,6 +11,8 @@ import { MessageSquare, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { PostComment } from '@/types/community';
+import Link from 'next/link';
+import { Timestamp } from 'firebase/firestore';
 
 interface CommunityCommentSectionProps {
   postId: string;
@@ -104,19 +106,62 @@ function CommentItem({ comment }: { comment: PostComment }) {
     .toUpperCase()
     .slice(0, 2);
 
+  /**
+   * Función helper para convertir diferentes tipos de fechas a Date
+   * Maneja: Date, string, Timestamp de Firestore, y objetos con seconds/nanoseconds
+   */
+  const convertToDate = (date: any): Date => {
+    // Si es un Timestamp de Firestore con método toDate
+    if (date && typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+      return date.toDate();
+    }
+    // Si es un objeto con seconds (Timestamp serializado)
+    if (date && typeof date === 'object' && ('seconds' in date || '_seconds' in date)) {
+      const seconds = date.seconds || date._seconds || 0;
+      const nanoseconds = date.nanoseconds || date._nanoseconds || 0;
+      return new Timestamp(seconds, nanoseconds).toDate();
+    }
+    // Si ya es un Date
+    if (date instanceof Date) {
+      return date;
+    }
+    // Si es un string
+    if (typeof date === 'string') {
+      return new Date(date);
+    }
+    // Si es un número (timestamp)
+    if (typeof date === 'number') {
+      return new Date(date);
+    }
+    // Fallback: fecha actual
+    return new Date();
+  };
+
   return (
     <Card className="p-4">
       <div className="flex gap-3">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={comment.userAvatar} alt={comment.userName} />
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+        {/* Avatar clickeable para ir al perfil */}
+        <Link 
+          href={`/profile/${comment.userId}`}
+          className="hover:opacity-80 transition-opacity"
+        >
+          <Avatar className="h-10 w-10 cursor-pointer">
+            <AvatarImage src={comment.userAvatar} alt={comment.userName} />
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+        </Link>
         
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="font-semibold">{comment.userName}</span>
+            {/* Nombre clickeable para ir al perfil */}
+            <Link 
+              href={`/profile/${comment.userId}`}
+              className="font-semibold hover:text-primary transition-colors cursor-pointer"
+            >
+              {comment.userName}
+            </Link>
             <span className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(comment.createdAt), {
+              {formatDistanceToNow(convertToDate(comment.createdAt), {
                 addSuffix: true,
                 locale: es,
               })}
@@ -129,6 +174,9 @@ function CommentItem({ comment }: { comment: PostComment }) {
     </Card>
   );
 }
+
+
+
 
 
 

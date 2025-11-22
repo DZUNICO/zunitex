@@ -24,9 +24,11 @@ interface ProfileHeaderProps {
     role: string;
     photoURL?: string | null;
   };
+  isOwnProfile?: boolean; // Si es true, muestra botones de edición
+  userId?: string; // ID del usuario para ProfileStats
 }
 
-export function ProfileHeader({ profile }: ProfileHeaderProps) {
+export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileHeaderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [currentAvatar, setCurrentAvatar] = useState<string | null>(profile.photoURL ?? null);
   const [currentProfile, setCurrentProfile] = useState(profile);
@@ -63,17 +65,40 @@ export function ProfileHeader({ profile }: ProfileHeaderProps) {
         <div className="flex flex-col md:flex-row md:gap-8">
           {/* Columna izquierda con foto y botones */}
           <div className="flex flex-col items-center md:items-start">
-            <ProfileImageUpload 
-              currentImageUrl={currentAvatar} 
-              onImageUpdate={handleAvatarUpdate}
-            />
-            <Button 
-            variant="outline" 
-            onClick={() => setIsEditing(true)}
-            className="w-full max-w-[200px] mx-auto my-2"
-          >
-            Editar Perfil
-          </Button>
+            {/* Mostrar Avatar sin edición si no es perfil propio */}
+            {isOwnProfile ? (
+              <ProfileImageUpload 
+                currentImageUrl={currentAvatar} 
+                onImageUpdate={handleAvatarUpdate}
+              />
+            ) : (
+              <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-background shadow-lg">
+                {currentAvatar ? (
+                  <img 
+                    src={currentAvatar} 
+                    alt={currentProfile.displayName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                    <span className="text-2xl font-bold text-muted-foreground">
+                      {currentProfile.displayName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Botón editar solo si es perfil propio */}
+            {isOwnProfile && (
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditing(true)}
+                className="w-full max-w-[200px] mx-auto my-2"
+              >
+                Editar Perfil
+              </Button>
+            )}
           </div>
 
           {/* Columna derecha con información del perfil */}
@@ -120,16 +145,19 @@ export function ProfileHeader({ profile }: ProfileHeaderProps) {
 
         {/* Stats se mantienen abajo */}
         <div className="mt-8">
-          <ProfileStats />
+          <ProfileStats userId={isOwnProfile ? undefined : userId} />
         </div>
       </Card>
 
-      <ProfileEditDialog 
-        open={isEditing} 
-        onOpenChange={setIsEditing}
-        profile={currentProfile}
-        onUpdate={handleProfileUpdate}
-      />
+      {/* Dialog de edición solo si es perfil propio */}
+      {isOwnProfile && (
+        <ProfileEditDialog 
+          open={isEditing} 
+          onOpenChange={setIsEditing}
+          profile={currentProfile}
+          onUpdate={handleProfileUpdate}
+        />
+      )}
     </div>
   );
 }

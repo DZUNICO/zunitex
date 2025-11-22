@@ -32,6 +32,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/utils/logger';
 
 const menuItems = [
   {
@@ -76,7 +77,7 @@ export function Navbar() {
       await logout();
       router.push('/login');
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
+      logger.error('Error al cerrar sesión', error as Error);
     }
   };
 

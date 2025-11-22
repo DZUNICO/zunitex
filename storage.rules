@@ -1,0 +1,149 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ========= Helper Functions =========
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Admin: email hardcodeado (como está implementado en el proyecto)
+    function isAdmin() {
+      return isAuth() && request.auth.token.email == "diego.zuni@gmail.com";
+    }
+
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // Validar tipo de archivo por MIME type
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // Validar extensiones de archivo (adicional a MIME type para mayor seguridad)
+    function hasImageExtension(fileName) {
+      return fileName.matches('.*\\.(jpg|jpeg|png|webp|gif|svg|JPG|JPEG|PNG|WEBP|GIF|SVG)$');
+    }
+
+    // Validar tamaño
+    function maxSize(bytes) {
+      return request.resource.size <= bytes; // Cambiado a <= para incluir el límite exacto
+    }
+
+    // Validar que el projectId pertenece al usuario autenticado
+    function isProjectOwner(projectId) {
+      return isAuth() &&
+        get(/databases/(default)/documents/projects/$(projectId)).data.createdBy == request.auth.uid;
+    }
+
+    // Validar que el postId pertenece al usuario
+    function isCommunityPostOwner(postId) {
+      return isAuth() &&
+        get(/databases/(default)/documents/community-posts/$(postId)).data.userId == request.auth.uid;
+    }
+
+    // Validar que el blog post pertenece al admin/autor
+    function isBlogOwner(postId) {
+      return isAuth() &&
+        get(/databases/(default)/documents/blog-posts/$(postId)).data.authorId == request.auth.uid;
+    }
+
+    // ========== PROJECTS ==========
+    match /projects/{projectId}/{fileName} {
+      allow read: if isAuth();
+      
+      // CREATE: Solo el dueño puede crear, imagen + validaciones
+      allow write: if resource == null
+                    && (isProjectOwner(projectId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(10 * 1024 * 1024);
+      
+      // UPDATE/DELETE: Solo el dueño o admin
+      allow write: if resource != null
+                    && (isProjectOwner(projectId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(10 * 1024 * 1024);
+    }
+
+    // ========== COMMUNITY POSTS ==========
+    match /posts/{postId}/{fileName} {
+      allow read: if isAuth();
+      
+      // CREATE: Solo el dueño del post
+      allow write: if resource == null
+                    && (isCommunityPostOwner(postId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(10 * 1024 * 1024);
+      
+      // UPDATE/DELETE: Solo el dueño o admin
+      allow write: if resource != null
+                    && (isCommunityPostOwner(postId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(10 * 1024 * 1024);
+    }
+
+    // ========== RESOURCES ==========
+    // IMPORTANTE: Mantiene estructura actual /resources/{userId}/{fileName}
+    match /resources/{userId}/{fileName} {
+      allow read: if true; // Público (como en la versión actual)
+      
+      // CREATE: Solo el propietario
+      allow write: if resource == null
+                    && (isOwner(userId) || isAdmin())
+                    && maxSize(100 * 1024 * 1024);
+      
+      // UPDATE/DELETE: Solo el propietario o admin
+      allow write: if resource != null
+                    && (isOwner(userId) || isAdmin())
+                    && maxSize(100 * 1024 * 1024);
+    }
+
+    // ========== PROFILE IMAGES ==========
+    match /profiles/{userId}/{fileName} {
+      allow read: if true; // Público
+      
+      // CREATE: Solo el propietario
+      allow write: if resource == null
+                    && (isOwner(userId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(5 * 1024 * 1024);
+      
+      // UPDATE/DELETE: Solo el propietario o admin
+      allow write: if resource != null
+                    && (isOwner(userId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(5 * 1024 * 1024);
+    }
+
+    // ========== BLOG ==========
+    match /blog/{postId}/{fileName} {
+      allow read: if true; // Público
+      
+      // CREATE: Solo el autor del post
+      allow write: if resource == null
+                    && (isBlogOwner(postId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(10 * 1024 * 1024);
+      
+      // UPDATE/DELETE: Solo el autor o admin
+      allow write: if resource != null
+                    && (isBlogOwner(postId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(10 * 1024 * 1024);
+    }
+
+    // ========== DEFAULT DENY ==========
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

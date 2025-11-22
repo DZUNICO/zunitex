@@ -16,7 +16,11 @@ interface ProfileStats {
   following: number;
 }
 
-export function ProfileStats() {
+interface ProfileStatsProps {
+  userId?: string; // Si se proporciona, obtiene stats de ese usuario, sino del usuario actual
+}
+
+export function ProfileStats({ userId }: ProfileStatsProps = {}) {
   const [stats, setStats] = useState<ProfileStats>({
     totalProjects: 0,
     completedProjects: 0,
@@ -28,10 +32,13 @@ export function ProfileStats() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); // Obtenemos el usuario del contexto de autenticación
 
+  // Usar userId proporcionado o el usuario actual
+  const targetUserId = userId || user?.uid;
+
   useEffect(() => {
     const fetchStats = async () => {
-      // Verificar si tenemos un usuario autenticado
-      if (!user?.uid) {
+      // Verificar si tenemos un usuario
+      if (!targetUserId) {
         setLoading(false);
         return;
       }
@@ -39,9 +46,12 @@ export function ProfileStats() {
       try {
         setLoading(true);
         
-        // Proyectos
+        // Proyectos - buscar por createdBy o userId según el esquema
         const projectsSnap = await getDocs(
-          query(collection(db, 'projects'), where('userId', '==', user.uid))
+          query(
+            collection(db, 'projects'), 
+            where('createdBy', '==', targetUserId)
+          )
         );
         
         const totalProjects = projectsSnap.size;
@@ -49,9 +59,9 @@ export function ProfileStats() {
           doc => doc.data().status === 'completado'
         ).length;
 
-        // Reseñas
+        // Reseñas - obtener reseñas del usuario visitado
         const reviewsSnap = await getDocs(
-          query(collection(db, 'reviews'), where('userId', '==', user.uid))
+          query(collection(db, 'reviews'), where('userId', '==', targetUserId))
         );
         
         const totalReviews = reviewsSnap.size;
@@ -61,12 +71,12 @@ export function ProfileStats() {
 
         // Seguidores
         const followersSnap = await getDocs(
-          query(collection(db, 'followers'), where('followingId', '==', user.uid))
+          query(collection(db, 'followers'), where('followingId', '==', targetUserId))
         );
         
         // Siguiendo
         const followingSnap = await getDocs(
-          query(collection(db, 'followers'), where('followerId', '==', user.uid))
+          query(collection(db, 'followers'), where('followerId', '==', targetUserId))
         );
 
         setStats({
@@ -86,7 +96,7 @@ export function ProfileStats() {
     };
 
     fetchStats();
-  }, [user?.uid]); // Dependencia del useEffect
+  }, [targetUserId]); // Dependencia del useEffect
 
   if (loading) {
     return (

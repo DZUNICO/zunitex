@@ -11,6 +11,7 @@ import { MessageSquare, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { BlogComment } from '@/lib/firebase/blog-comments';
+import Link from 'next/link';
 
 interface BlogCommentSectionProps {
   postId: string;
@@ -107,14 +108,26 @@ function CommentItem({ comment }: { comment: BlogComment }) {
   return (
     <Card className="p-4">
       <div className="flex gap-3">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={comment.userAvatar} alt={comment.userName} />
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+        {/* Avatar clickeable para ir al perfil */}
+        <Link 
+          href={`/profile/${comment.userId}`}
+          className="hover:opacity-80 transition-opacity"
+        >
+          <Avatar className="h-10 w-10 cursor-pointer">
+            <AvatarImage src={comment.userAvatar} alt={comment.userName} />
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+        </Link>
         
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="font-semibold">{comment.userName}</span>
+            {/* Nombre clickeable para ir al perfil */}
+            <Link 
+              href={`/profile/${comment.userId}`}
+              className="font-semibold hover:text-primary transition-colors cursor-pointer"
+            >
+              {comment.userName}
+            </Link>
             <span className="text-sm text-muted-foreground">
               {formatDistanceToNow(new Date(comment.createdAt), {
                 addSuffix: true,

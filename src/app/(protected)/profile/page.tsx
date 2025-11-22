@@ -29,7 +29,10 @@ export default function ProfilePage() {
 
   return (
     <div className="container max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
-      <ProfileHeader profile={transformUserToProfileHeader(profile)} />
+      <ProfileHeader 
+        profile={transformUserToProfileHeader(profile)} 
+        isOwnProfile={true}
+      />
       <ProfileTabs profile={profile} />
     </div>
   );

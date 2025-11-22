@@ -27,7 +27,8 @@ export function CommunityPostFilters({
   const handleCategoryChange = (category: string) => {
     onFiltersChange({
       ...filters,
-      category: filters.category === category ? undefined : category,
+      // Cast a PostCategory ya que sabemos que las categorías del array son válidas
+      category: filters.category === category ? undefined : (category as CommunityFilters['category']),
     });
   };
 

@@ -64,12 +64,24 @@ export function BlogCard({ post, featured = false }: BlogCardProps) {
 
           <div className="flex items-center justify-between pt-4">
             <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={post.authorPhotoURL || undefined} />
-                <AvatarFallback>{post.authorName[0]}</AvatarFallback>
-              </Avatar>
+              {/* Avatar clickeable para ir al perfil del autor */}
+              <Link 
+                href={`/profile/${post.authorId}`}
+                className="hover:opacity-80 transition-opacity"
+              >
+                <Avatar className="h-8 w-8 cursor-pointer">
+                  <AvatarImage src={post.authorPhotoURL || undefined} />
+                  <AvatarFallback>{post.authorName[0]}</AvatarFallback>
+                </Avatar>
+              </Link>
               <div>
-                <p className="font-medium text-sm">{post.authorName}</p>
+                {/* Nombre clickeable para ir al perfil del autor */}
+                <Link 
+                  href={`/profile/${post.authorId}`}
+                  className="font-medium text-sm hover:text-primary transition-colors cursor-pointer block"
+                >
+                  {post.authorName}
+                </Link>
                 <p className="text-xs text-muted-foreground">
                   {formatBlogDate(post.createdAt)}
                 </p>

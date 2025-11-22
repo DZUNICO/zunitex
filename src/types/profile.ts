@@ -35,7 +35,7 @@
   // Función helper para transformar UserProfile a ProfileHeader
   export function transformUserToProfileHeader(user: UserProfile): ProfileHeader {
     return {
-      id: user.email, // Usando email como ID si no hay uno específico
+      id: user.id || user.email, // Usar ID si existe, sino usar email como fallback
       displayName: user.displayName,
       email: user.email,
       about: user.about,
@@ -50,4 +50,5 @@
   }
   export interface ProfileTabsProps {
     profile: UserProfile;
+    userId?: string; // ID del usuario para obtener proyectos (si no se proporciona, usa el usuario actual)
   }

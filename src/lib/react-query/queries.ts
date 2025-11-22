@@ -189,6 +189,32 @@ export function useUserProjects() {
 }
 
 /**
+ * Hook para obtener proyectos de cualquier usuario por su ID
+ * Útil para visualizar proyectos de otros usuarios en sus perfiles
+ */
+export function useUserProjectsById(userId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.projects.list({ userId: userId || '' }),
+    queryFn: async () => {
+      if (!userId) {
+        throw new Error('ID de usuario requerido');
+      }
+      
+      logger.debug('Fetching user projects by ID', { userId });
+      const projects = await projectsService.getUserProjects(userId);
+      
+      return projects.map((project) => ({
+        ...project,
+        images: project.images || [],
+        tags: project.tags || [],
+      })) as Project[];
+    },
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000, // 2 minutos
+  });
+}
+
+/**
  * Hook para obtener un proyecto específico
  */
 export function useProject(projectId: string | undefined) {
@@ -769,6 +795,34 @@ export function useUserProfile() {
       return docSnap.data() as UserProfile;
     },
     enabled: !!user?.uid,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+}
+
+/**
+ * Hook para obtener el perfil de cualquier usuario por su ID
+ * Útil para visualizar perfiles de otros usuarios
+ */
+export function useUserProfileById(userId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.profile.detail(userId || ''),
+    queryFn: async () => {
+      if (!userId) {
+        throw new Error('ID de usuario requerido');
+      }
+
+      logger.debug('Fetching user profile by ID', { userId });
+      const docRef = doc(db, 'users', userId);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        throw new Error('Perfil no encontrado');
+      }
+
+      const data = docSnap.data() as UserProfile;
+      return { ...data, id: userId };
+    },
+    enabled: !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutos
   });
 }

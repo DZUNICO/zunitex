@@ -1,5 +1,6 @@
 import { storage } from './config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { logger } from '@/lib/utils/logger';
 
 export const storageService = {
   async uploadProjectImages(projectId: string, files: File[]): Promise<string[]> {
@@ -14,7 +15,7 @@ export const storageService = {
         const url = await getDownloadURL(snapshot.ref);
         urls.push(url);
       } catch (error) {
-        console.error('Error uploading image:', error);
+        logger.error('Error uploading project image', error as Error, { projectId, fileName: file.name });
       }
     }
 
@@ -39,7 +40,7 @@ export const storageService = {
       const results = await Promise.all(uploadPromises);
       return results;
     } catch (error) {
-      console.error('Error uploading images:', error);
+      logger.error('Error uploading post images', error as Error, { postId, filesCount: files.length });
       throw error;
     }
   }
