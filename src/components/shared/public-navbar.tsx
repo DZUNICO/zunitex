@@ -52,7 +52,7 @@ export function PublicNavbar() {
             <Link href="/" className="flex items-center space-x-2">
               <Zap className="h-6 w-6 text-primary" />
               <span className="font-bold text-xl hidden sm:inline-block">
-                ElectricianHub
+                STARLOGIC
               </span>
             </Link>
           </div>

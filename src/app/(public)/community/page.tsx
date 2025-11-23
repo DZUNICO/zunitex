@@ -11,6 +11,8 @@ import { Loader2, Sparkles, Clock, TrendingUp } from 'lucide-react';
 import type { CommunityFilters } from '@/types/community';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
+import { ErrorBoundary } from '@/components/shared/error-boundary';
+import { FeedErrorFallback } from '@/components/shared/error-fallbacks';
 
 function CommunityContent() {
   const queryClient = useQueryClient();
@@ -102,8 +104,13 @@ function CommunityContent() {
             {/* Formulario de crear post - en la parte superior del feed */}
             <CreatePostForm onSuccess={handlePostCreated} />
 
-            {/* Tabs de filtros */}
-            <div className="bg-white rounded-lg border shadow-sm">
+            {/* Error Boundary para el feed */}
+            <ErrorBoundary
+              scope="section"
+              fallback={(reset) => <FeedErrorFallback onReset={reset} />}
+            >
+              {/* Tabs de filtros */}
+              <div className="bg-white rounded-lg border shadow-sm">
               <Tabs value={sortBy} onValueChange={(v) => setSortBy(v as 'recent' | 'hot')} className="w-full">
                 <div className="border-b px-4">
                   <TabsList className="bg-transparent h-auto p-0">
@@ -215,6 +222,7 @@ function CommunityContent() {
                 </TabsContent>
               </Tabs>
             </div>
+            </ErrorBoundary>
           </div>
 
           {/* Sidebar derecho */}

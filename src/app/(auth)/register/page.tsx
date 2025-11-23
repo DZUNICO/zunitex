@@ -6,7 +6,7 @@ export default function RegisterPage() {
     <div className="container mx-auto max-w-md py-12">
       <Card>
         <CardHeader>
-          <CardTitle>Registro en ElectricianHub</CardTitle>
+          <CardTitle>Registro en STARLOGIC</CardTitle>
         </CardHeader>
         <CardContent>
           <RegisterForm />

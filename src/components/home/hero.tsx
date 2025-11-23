@@ -6,7 +6,7 @@ export function Hero() {
     <div className="bg-primary/5 py-16 px-4">
       <div className="container mx-auto text-center">
         <h1 className="text-4xl md:text-6xl font-bold mb-6">
-          ElectricianHub
+          STARLOGIC
         </h1>
         <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto">
           La red social profesional para electricistas. Conéctate, aprende y crece con la comunidad.

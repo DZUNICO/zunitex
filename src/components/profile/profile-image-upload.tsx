@@ -9,6 +9,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Loader2, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ErrorBoundary } from '@/components/shared/error-boundary';
+import { UploadErrorFallback } from '@/components/shared/error-fallbacks';
 
 interface ProfileImageUploadProps {
   currentImageUrl?: string | null;
@@ -151,57 +153,62 @@ export function ProfileImageUpload({ currentImageUrl, onImageUpdate }: ProfileIm
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      {/* Solo el Avatar centrado */}
-      <div className="relative flex justify-center w-full">
-        <Avatar className="h-24 w-24">
-          {currentImageUrl ? (
-            <AvatarImage src={currentImageUrl} alt="Foto de perfil" />
-          ) : (
-            <AvatarFallback>
-              {user?.email?.[0].toUpperCase()}
-            </AvatarFallback>
+    <ErrorBoundary
+      scope="component"
+      fallback={(reset) => <UploadErrorFallback onReset={reset} />}
+    >
+      <div className="flex flex-col items-center gap-4">
+        {/* Solo el Avatar centrado */}
+        <div className="relative flex justify-center w-full">
+          <Avatar className="h-24 w-24">
+            {currentImageUrl ? (
+              <AvatarImage src={currentImageUrl} alt="Foto de perfil" />
+            ) : (
+              <AvatarFallback>
+                {user?.email?.[0].toUpperCase()}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          {uploading && (
+            <div className="absolute inset-0 bg-background/80 rounded-full flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
           )}
-        </Avatar>
-        {uploading && (
-          <div className="absolute inset-0 bg-background/80 rounded-full flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        )}
-      </div>
+        </div>
 
-      {/* Botones abajo */}
-      <div className="flex gap-2 mt-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="relative"
-          disabled={uploading}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            onChange={handleImageUpload}
-            accept="image/*"
-            disabled={uploading}
-          />
-          <Upload className="h-4 w-4 mr-2" />
-          Cambiar foto
-        </Button>
-
-        {currentImageUrl && (
+        {/* Botones abajo */}
+        <div className="flex gap-2 mt-2">
           <Button
-            variant="destructive"
+            variant="outline"
             size="sm"
-            onClick={handleDelete}
+            className="relative"
             disabled={uploading}
           >
-            <X className="h-4 w-4 mr-2" />
-            Eliminar
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              onChange={handleImageUpload}
+              accept="image/*"
+              disabled={uploading}
+            />
+            <Upload className="h-4 w-4 mr-2" />
+            Cambiar foto
           </Button>
-        )}
+
+          {currentImageUrl && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              disabled={uploading}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Eliminar
+            </Button>
+          )}
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
