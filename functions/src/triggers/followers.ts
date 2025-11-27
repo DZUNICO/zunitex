@@ -1,0 +1,11 @@
+// Followers Cloud Function
+// Se implementará en siguiente paso
+
+export const followersPlaceholder = () => {
+  // Placeholder
+};
+
+
+
+
+

@@ -9,6 +9,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Loader2, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/react-query/queries';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { UploadErrorFallback } from '@/components/shared/error-fallbacks';
 
@@ -23,6 +25,7 @@ export function ProfileImageUpload({ currentImageUrl, onImageUpdate }: ProfileIm
   //const [imageUrl, setImageUrl] = useState<string | null | undefined>(currentImageUrl);
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Validación de archivo
   const validateFile = (file: File): boolean => {
@@ -59,6 +62,11 @@ export function ProfileImageUpload({ currentImageUrl, onImageUpdate }: ProfileIm
       // Actualizar en Firestore
       await updateDoc(userRef, { photoURL: avatarUrl });
       
+      // Invalidar la query para que se recargue el perfil desde Firestore
+      await queryClient.invalidateQueries({ 
+        queryKey: queryKeys.profile.detail(user.uid) 
+      });
+      
       /* // Actualizar en Auth
       if (user) {
         await updateProfile(user, {
@@ -73,11 +81,10 @@ export function ProfileImageUpload({ currentImageUrl, onImageUpdate }: ProfileIm
         description: "No se pudo actualizar la foto de perfil"
       });
     }
-  }, [user]);
+  }, [user, queryClient]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    console.log(file)
     if (!file || !user) return;
 
     if (!validateFile(file)) {
@@ -91,19 +98,17 @@ export function ProfileImageUpload({ currentImageUrl, onImageUpdate }: ProfileIm
     try {
       setUploading(true);
 
-      if (currentImageUrl) {
-        try {
-          await storageService.deleteProfileImage(user.uid, currentImageUrl);
-        } catch (error) {
-          console.warn('Error al eliminar imagen anterior:', error);
-        }
-      }
-
-      const newImageUrl = await storageService.uploadProfileImage(user.uid, file);
+      // El servicio se encarga de eliminar la imagen anterior si existe
+      const newImageUrl = await storageService.uploadProfileImage(user.uid, file, currentImageUrl);
       
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         photoURL: newImageUrl
+      });
+
+      // Invalidar la query para que se recargue el perfil desde Firestore
+      await queryClient.invalidateQueries({ 
+        queryKey: queryKeys.profile.detail(user.uid) 
       });
 
       onImageUpdate?.(newImageUrl);
@@ -135,6 +140,12 @@ export function ProfileImageUpload({ currentImageUrl, onImageUpdate }: ProfileIm
       setUploading(true);
       await storageService.deleteProfileImage(user.uid, currentImageUrl);
       await updateUserProfile(null);
+      
+      // Invalidar la query para que se recargue el perfil desde Firestore
+      await queryClient.invalidateQueries({ 
+        queryKey: queryKeys.profile.detail(user.uid) 
+      });
+      
       onImageUpdate?.(null);
 
       toast({

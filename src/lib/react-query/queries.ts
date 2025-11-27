@@ -258,7 +258,7 @@ export function useCreateProject() {
       const newProjectData: Omit<Project, 'id'> = {
         ...data,
         createdBy: user.uid,
-        createdAt: new Date(),
+        // createdAt se maneja con serverTimestamp() en projectsService
         status: data.status || 'Pendiente',
         images: data.images || [],
         tags: data.tags || [],
@@ -481,7 +481,7 @@ export function useAddComment() {
         userDisplayName: profileQuery.data?.displayName || 'Usuario',
         photoURL: profileQuery.data?.photoURL || null,
         content,
-        createdAt: new Date(),
+        // createdAt y updatedAt se manejan en commentService con serverTimestamp()
       });
     },
     onMutate: async ({ projectId, content }) => {
@@ -789,10 +789,28 @@ export function useUserProfile() {
       const docSnap = await getDoc(docRef);
 
       if (!docSnap.exists()) {
-        throw new Error('Perfil no encontrado');
+        // Si el perfil no existe, crear uno básico
+        logger.warn('User profile not found, creating default profile', { userId: user.uid });
+        const { setDoc } = await import('firebase/firestore');
+        const defaultProfile = {
+          email: user.email || '',
+          displayName: user.displayName || 'Usuario',
+          phone: user.phoneNumber || '',
+          role: 'user' as const,
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          projectsCount: 0,
+          rating: 0,
+          specialties: [] as string[],
+          photoURL: user.photoURL || null,
+          active: true,
+        };
+        await setDoc(docRef, defaultProfile);
+        return { ...defaultProfile, id: user.uid } as UserProfile;
       }
 
-      return docSnap.data() as UserProfile;
+      const profileData = docSnap.data() as UserProfile;
+      return { ...profileData, id: user.uid } as UserProfile;
     },
     enabled: !!user?.uid,
     staleTime: 5 * 60 * 1000, // 5 minutos
@@ -1281,7 +1299,7 @@ export function useCommunityPost(postId: string | undefined) {
  */
 export function useCreateCommunityPost() {
   const { user } = useAuth();
-  const { data: profile } = useUserProfile();
+  const { data: profile, isLoading: profileLoading } = useUserProfile();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1291,11 +1309,22 @@ export function useCreateCommunityPost() {
         throw new Error('Usuario no autenticado');
       }
 
+      // Esperar a que el perfil se cargue si aún está cargando
+      if (profileLoading) {
+        // Esperar un momento para que el perfil se cargue
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Obtener el perfil actualizado si está disponible
+      const currentProfile = queryClient.getQueryData<UserProfile>(
+        queryKeys.profile.detail(user.uid)
+      ) || profile;
+
       return await communityService.createPost({
         ...data,
         userId: user.uid,
-        userName: profile?.displayName || user.displayName || 'Usuario',
-        userAvatar: profile?.photoURL || user.photoURL || undefined,
+        userName: currentProfile?.displayName || user.displayName || 'Usuario',
+        userAvatar: currentProfile?.photoURL || user.photoURL || undefined,
       });
     },
     onSuccess: () => {
@@ -1340,7 +1369,7 @@ export function useCommunityPostComments(postId: string | undefined) {
  */
 export function useAddCommunityComment() {
   const { user } = useAuth();
-  const { data: profile } = useUserProfile();
+  const { data: profile, isLoading: profileLoading } = useUserProfile();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1350,11 +1379,22 @@ export function useAddCommunityComment() {
         throw new Error('Usuario no autenticado');
       }
 
+      // Esperar a que el perfil se cargue si aún está cargando
+      if (profileLoading) {
+        // Esperar un momento para que el perfil se cargue
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Obtener el perfil actualizado si está disponible
+      const currentProfile = queryClient.getQueryData<UserProfile>(
+        queryKeys.profile.detail(user.uid)
+      ) || profile;
+
       return await communityService.addPostComment({
         postId,
         userId: user.uid,
-        userName: profile?.displayName || user.displayName || 'Usuario',
-        userAvatar: profile?.photoURL || user.photoURL || undefined,
+        userName: currentProfile?.displayName || user.displayName || 'Usuario',
+        userAvatar: currentProfile?.photoURL || user.photoURL || undefined,
         content,
       });
     },
@@ -1422,25 +1462,91 @@ export function useLikeCommunityPost() {
       await queryClient.cancelQueries({ 
         queryKey: queryKeys.community.likeStatus(postId, user?.uid || '') 
       });
+      await queryClient.cancelQueries({ 
+        queryKey: queryKeys.community.detail(postId) 
+      });
+      await queryClient.cancelQueries({ 
+        queryKey: queryKeys.community.lists() 
+      });
 
       const previousStatus = queryClient.getQueryData<boolean>(
         queryKeys.community.likeStatus(postId, user?.uid || '')
       );
+      const previousPost = queryClient.getQueryData<CommunityPost>(
+        queryKeys.community.detail(postId)
+      );
 
-      // Optimistic update
+      // Guardar el estado anterior de todas las listas
+      const previousLists = queryClient.getQueriesData<{
+        pages: Array<{ posts: CommunityPost[]; nextCursor: QueryDocumentSnapshot | null }>;
+        pageParams: unknown[];
+      }>({ queryKey: queryKeys.community.lists() });
+
+      // Optimistic update del estado de like
       queryClient.setQueryData(
         queryKeys.community.likeStatus(postId, user?.uid || ''),
         like
       );
 
-      return { previousStatus };
+      // Optimistic update del contador de likes en el detalle
+      if (previousPost) {
+        queryClient.setQueryData<CommunityPost>(
+          queryKeys.community.detail(postId),
+          {
+            ...previousPost,
+            likes: like ? (previousPost.likes || 0) + 1 : Math.max(0, (previousPost.likes || 0) - 1),
+          }
+        );
+      }
+
+      // Optimistic update del contador de likes en todas las listas (infinite query)
+      queryClient.setQueriesData<{
+        pages: Array<{ posts: CommunityPost[]; nextCursor: QueryDocumentSnapshot | null }>;
+        pageParams: unknown[];
+      }>(
+        { queryKey: queryKeys.community.lists() },
+        (oldData) => {
+          if (!oldData) return oldData;
+
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              posts: page.posts.map((post) =>
+                post.id === postId
+                  ? {
+                      ...post,
+                      likes: like ? (post.likes || 0) + 1 : Math.max(0, (post.likes || 0) - 1),
+                    }
+                  : post
+              ),
+            })),
+          };
+        }
+      );
+
+      return { previousStatus, previousPost, previousLists };
     },
     onError: (error, variables, context) => {
+      // Revertir estado de like
       if (context?.previousStatus !== undefined) {
         queryClient.setQueryData(
           queryKeys.community.likeStatus(variables.postId, user?.uid || ''),
           context.previousStatus
         );
+      }
+      // Revertir contador de likes en el detalle
+      if (context?.previousPost) {
+        queryClient.setQueryData<CommunityPost>(
+          queryKeys.community.detail(variables.postId),
+          context.previousPost
+        );
+      }
+      // Revertir cambios en todas las listas
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
       logger.error('Error liking/unliking community post', error as Error);
       toast({
@@ -1455,6 +1561,10 @@ export function useLikeCommunityPost() {
       });
       queryClient.invalidateQueries({ 
         queryKey: queryKeys.community.detail(variables.postId) 
+      });
+      // Invalidar también la lista para actualizar contadores en las tarjetas
+      queryClient.invalidateQueries({ 
+        queryKey: queryKeys.community.lists() 
       });
     },
   });

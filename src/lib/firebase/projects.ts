@@ -13,6 +13,7 @@ import {
   orderBy,
   limit,
   startAfter,
+  serverTimestamp,
   QueryDocumentSnapshot
 } from 'firebase/firestore';
 import type { Project } from '@/types/project';
@@ -24,7 +25,7 @@ export const projectsService = {
     try {
       const docRef = await addDoc(collection(db, 'projects'), {
         ...projectData,
-        createdAt: new Date(),
+        createdAt: serverTimestamp(), // Usar serverTimestamp para consistencia
       });
       return docRef.id;
     } catch (error) {

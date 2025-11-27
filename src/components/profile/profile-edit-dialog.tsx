@@ -23,9 +23,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from "@/lib/firebase/config";
 import { useAuth } from "@/lib/context/auth-context";
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/react-query/queries';
 import {
   Select,
   SelectContent,
@@ -62,6 +64,7 @@ export function ProfileEditDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -70,6 +73,7 @@ export function ProfileEditDialog({
       location: profile.location || '',
       about: profile.about || '',
       specialties: profile.specialties?.join(', ') || '',
+      role: profile.role || 'user',
     },
   });
 
@@ -85,7 +89,13 @@ export function ProfileEditDialog({
         location: data.location,
         about: data.about,
         specialties: data.specialties,
-        role: data.role
+        role: data.role,
+        updatedAt: serverTimestamp()
+      });
+
+      // Invalidar la query para que se recargue el perfil desde Firestore
+      await queryClient.invalidateQueries({ 
+        queryKey: queryKeys.profile.detail(user.uid) 
       });
 
       onUpdate({

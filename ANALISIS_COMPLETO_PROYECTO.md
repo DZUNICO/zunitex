@@ -1,7 +1,7 @@
 # 📊 ANÁLISIS COMPLETO DEL PROYECTO STARLOGIC
 
 **Fecha del análisis**: Diciembre 2024  
-**Última actualización**: Diciembre 2024 - Visualización de perfiles visitantes y correcciones de Timestamps  
+**Última actualización**: Diciembre 2024 - Cloud Functions para Post Likes, correcciones de reglas Firestore y serverTimestamp  
 **Proyecto**: STARLOGIC (Zunitex)  
 **Framework**: Next.js 15.0.3 con React 18.1
 
@@ -739,7 +739,7 @@ isValidEmail(email)    // Valida formato de email
 **`users`:**
 - ✅ READ: Autenticados pueden leer
 - ✅ CREATE: Solo el mismo usuario puede crearse
-- ✅ UPDATE: Solo el propietario (no puede cambiar role/email)
+- ✅ UPDATE: Solo el propietario (no puede cambiar role/email, permite actualizar `lastLogin` automáticamente)
 - ✅ DELETE: Solo admin
 
 **`projects`:**
@@ -769,7 +769,7 @@ isValidEmail(email)    // Valida formato de email
 **`community-posts`:**
 - ✅ READ: Autenticados
 - ✅ CREATE: Autenticados (valida categoría, tags, conteos iniciales)
-- ✅ UPDATE: Propietario o admin
+- ✅ UPDATE: Propietario o admin O cualquier autenticado puede actualizar contadores (`commentsCount`, `likes`, `views`)
 - ✅ DELETE: Propietario o admin
 
 **`followers`:**
@@ -1192,8 +1192,13 @@ Hooks:
 
 | Función | Parámetros | Retorna |
 |---------|-----------|---------|
-| `addComment` | `data: Omit<Comment, 'id'>` | `string` (commentId) |
+| `addComment` | `data: Omit<Comment, 'id' \| 'createdAt' \| 'updatedAt'>` | `string` (commentId) |
 | `getProjectComments` | `projectId: string` | `Comment[]` |
+
+**Características:**
+- ✅ **serverTimestamp():** `addComment()` usa `serverTimestamp()` para `createdAt` y `updatedAt`
+- ✅ No requiere `createdAt` en el input (se maneja internamente)
+- ✅ Conversión automática de Timestamps a Date al recuperar
 
 ### 6.5 `src/lib/firebase/blog-comments.ts`
 
@@ -1846,12 +1851,17 @@ createReviewSchema = z.object({
     - ✅ Validación de datos
     - ✅ Protección de campos inmutables
 
-11. **Visualización de Perfiles:**
+12. **Visualización de Perfiles:**
     - ✅ Página de perfil propio (`/profile`)
     - ✅ Página de perfil visitante (`/profile/[userId]`)
     - ✅ Componentes reutilizables con props opcionales
     - ✅ Manejo robusto de Timestamps de Firestore
     - ✅ Validaciones y redirecciones automáticas
+
+13. **Timestamps y Consistencia:**
+    - ✅ Uso de `serverTimestamp()` en lugar de `new Date()` para creación de documentos
+    - ✅ Consistencia de timestamps en servidor
+    - ✅ Conversión automática de Timestamps a Date al recuperar datos
 
 #### 🚧 En Progreso
 
@@ -2040,6 +2050,10 @@ El proyecto **STARLOGIC** es una aplicación Next.js moderna y bien estructurada
 - Hooks nuevos: `useUserProfileById()`, `useUserProjectsById()`
 - Correcciones de manejo de Timestamps de Firestore en múltiples componentes
 - Validaciones y redirecciones automáticas en perfiles visitantes
+- **Cloud Functions para Post Likes** con operaciones atómicas
+- **Correcciones de reglas Firestore** (proyectos, comentarios, contadores)
+- **Uso de serverTimestamp()** para consistencia de timestamps
+- **Optimistic updates mejorados** para likes con rollback
 
 🎯 **Estado general:** ✅ **Listo para producción con mejoras menores recomendadas**
 
@@ -2141,7 +2155,123 @@ El proyecto **STARLOGIC** es una aplicación Next.js moderna y bien estructurada
 
 ---
 
+## 🔄 ACTUALIZACIÓN: Cloud Functions y Correcciones de Firestore (Diciembre 2024)
+
+### Cambios Implementados
+
+#### 1. Cloud Functions para Post Likes
+
+**Archivo:** `functions/src/triggers/post-likes.ts`
+
+- ✅ **`onPostLike`**: Trigger `onCreate` en colección `post-likes`
+  - Incrementa contador `likes` en `community-posts` de forma atómica
+  - Valida que el post exista antes de incrementar
+  - Manejo de errores con logging
+
+- ✅ **`onPostUnlike`**: Trigger `onDelete` en colección `post-likes`
+  - Decrementa contador `likes` en `community-posts` de forma atómica
+  - Valida que el post exista antes de decrementar
+  - Manejo de errores con logging
+
+**Características:**
+- ✅ Operaciones atómicas usando `FieldValue.increment()`
+- ✅ Validación de existencia de documentos
+- ✅ Logging detallado para debugging
+- ✅ Prevención de race conditions
+
+**Configuración:**
+- ✅ Admin SDK inicializado en `functions/src/config.ts`
+- ✅ Helpers de Firestore en `functions/src/utils/firestore-helpers.ts`
+- ✅ Exportación centralizada en `functions/src/index.ts`
+
+#### 2. Correcciones de Reglas de Firestore
+
+**Archivo:** `firestore.rules`
+
+**Proyectos (`/projects/{projectId}`):**
+- ✅ Cambiado de `hasAll()` a verificaciones individuales con `in` para permitir campos opcionales (`clientId`, `startDate`)
+- ✅ Cambiado `budget > 0` a `budget >= 0` para permitir presupuesto 0
+- ✅ Reglas permiten campos adicionales opcionales sin restricción
+
+**Comentarios (`/comments/{commentId}`):**
+- ✅ Reglas actualizadas para permitir actualizar `updatedAt`
+- ✅ Validación de contenido (1-1000 caracteres) mantenida
+
+**Community Posts (`/community-posts/{postId}`):**
+- ✅ Reglas actualizadas para permitir actualizar contadores (`commentsCount`, `likes`, `views`) por cualquier usuario autenticado
+- ✅ Cloud Functions pueden actualizar contadores automáticamente
+
+**Users (`/users/{userId}`):**
+- ✅ Regla específica para permitir actualizar solo `lastLogin` automáticamente
+
+#### 3. Uso de serverTimestamp() en lugar de new Date()
+
+**Archivos Actualizados:**
+
+**`src/lib/firebase/projects.ts`:**
+- ✅ `createProject()` ahora usa `serverTimestamp()` para `createdAt`
+- ✅ Eliminado `createdAt: new Date()` del código cliente
+
+**`src/lib/firebase/comments.ts`:**
+- ✅ `addComment()` actualizado para no requerir `createdAt` en el input
+- ✅ Usa `serverTimestamp()` internamente para `createdAt` y `updatedAt`
+- ✅ Tipo actualizado: `Omit<Comment, 'id' | 'createdAt' | 'updatedAt'>`
+
+**`src/lib/react-query/queries.ts`:**
+- ✅ `useAddComment()` actualizado para no enviar `createdAt` manualmente
+- ✅ `useCreateProject()` comentado que `createdAt` se maneja con `serverTimestamp()`
+
+**Beneficios:**
+- ✅ Consistencia de timestamps en el servidor
+- ✅ Evita problemas de sincronización de tiempo
+- ✅ Mejor para operaciones distribuidas
+
+#### 4. Correcciones de Permisos
+
+**Problemas Resueltos:**
+- ✅ Error al crear proyectos con `budget = 0` → Solucionado permitiendo `budget >= 0`
+- ✅ Error al comentar proyectos → Solucionado con reglas actualizadas
+- ✅ Error al actualizar `lastLogin` → Solucionado con regla específica
+- ✅ Error al actualizar contadores de posts → Solucionado permitiendo actualizaciones de contadores
+
+#### 5. Optimistic Updates Mejorados
+
+**`src/lib/react-query/queries.ts` - `useLikeCommunityPost`:**
+- ✅ Optimistic update para `isLiked` status
+- ✅ Optimistic update para contador `likes`
+- ✅ Invalidación de queries (`likeStatus`, `detail`, `lists`) en `onSuccess`
+- ✅ Rollback en `onError` si la mutación falla
+- ✅ UI se actualiza inmediatamente sin esperar respuesta del servidor
+
+#### 6. Configuración de Emuladores
+
+**`src/lib/firebase/config.ts`:**
+- ✅ Conexión automática a Firestore Emulator en desarrollo (`localhost:8080`)
+- ✅ Verificación de conexión existente para evitar errores
+- ✅ Configuración condicional basada en `NODE_ENV`
+
+**`functions/package.json`:**
+- ✅ Script `start` actualizado para incluir Firestore emulator
+- ✅ Script `start:functions-only` agregado como alternativa
+
+#### 7. Estructura de Cloud Functions
+
+**Archivos:**
+- ✅ `functions/src/config.ts` - Inicialización centralizada de Admin SDK
+- ✅ `functions/src/utils/firestore-helpers.ts` - Helpers reutilizables
+  - `incrementCounter()` - Incremento atómico de contadores
+  - `documentExists()` - Verificación de existencia
+- ✅ `functions/src/triggers/post-likes.ts` - Triggers de likes
+- ✅ `functions/src/index.ts` - Exportación centralizada
+
+**Características:**
+- ✅ ES Modules con extensiones `.js` en imports
+- ✅ Manejo robusto de errores
+- ✅ Logging detallado
+
+---
+
 **Documento generado:** Diciembre 2024  
-**Última actualización:** Diciembre 2024 - Visualización de perfil de otros usuarios y correcciones de Timestamps
+**Última actualización:** Diciembre 2024 - Cloud Functions para Post Likes, correcciones de reglas Firestore y serverTimestamp
 
 

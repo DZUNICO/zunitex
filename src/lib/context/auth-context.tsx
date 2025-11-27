@@ -11,7 +11,7 @@ import {
   browserLocalPersistence
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase/config';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { logger } from '@/lib/utils/logger';
 
 interface AuthContextType {
@@ -37,9 +37,17 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
           if (user) {
             try {
-              await setDoc(doc(db, 'users', user.uid), {
-                lastLogin: new Date().toISOString()
-              }, { merge: true });
+              // Usar updateDoc en lugar de setDoc para evitar problemas con reglas
+              const userDocRef = doc(db, 'users', user.uid);
+              const userDoc = await getDoc(userDocRef);
+              
+              if (userDoc.exists()) {
+                // Si el documento existe, actualizar solo lastLogin
+                await updateDoc(userDocRef, {
+                  lastLogin: new Date().toISOString()
+                });
+              }
+              // Si no existe, se creará en el registro (signUp)
               setUser(user);
             } catch (error) {
               logger.error('Error updating last login', error as Error, { userId: user.uid });

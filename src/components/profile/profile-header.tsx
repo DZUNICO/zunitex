@@ -38,6 +38,12 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
     setCurrentAvatar(profile.photoURL ?? null);
   }, [profile.photoURL]);
 
+  // Sincronizar el estado local con el prop profile cuando cambie
+  useEffect(() => {
+    setCurrentProfile(profile);
+    setCurrentAvatar(profile.photoURL ?? null);
+  }, [profile]);
+
   const handleProfileUpdate = (updatedProfile: typeof profile) => {
     setCurrentProfile(updatedProfile);
     setIsEditing(false);

@@ -223,16 +223,15 @@ export const communityService = {
         throw new Error('Ya has dado like a este post');
       }
 
-      await Promise.all([
-        addDoc(collection(db, 'post-likes'), {
-          userId,
-          postId,
-          createdAt: serverTimestamp(),
-        }),
-        updateDoc(doc(db, 'community-posts', postId), {
-          likes: increment(1),
-        }),
-      ]);
+      // SOLO crear documento en post-likes
+      // Cloud Function se encargará de incrementar contador automáticamente
+      await addDoc(collection(db, 'post-likes'), {
+        userId,
+        postId,
+        createdAt: serverTimestamp(),
+      });
+
+      // NO incrementar likes aquí - Cloud Function lo hace
     } catch (error) {
       logger.error('Error liking post', error as Error, { userId, postId });
       throw error;
@@ -252,12 +251,13 @@ export const communityService = {
         throw new Error('No has dado like a este post');
       }
 
-      await Promise.all([
-        ...existingLike.docs.map(doc => deleteDoc(doc.ref)),
-        updateDoc(doc(db, 'community-posts', postId), {
-          likes: increment(-1),
-        }),
-      ]);
+      // SOLO eliminar documento en post-likes
+      // Cloud Function se encargará de decrementar contador automáticamente
+      await Promise.all(
+        existingLike.docs.map((doc) => deleteDoc(doc.ref))
+      );
+
+      // NO decrementar likes aquí - Cloud Function lo hace
     } catch (error) {
       logger.error('Error unliking post', error as Error, { userId, postId });
       throw error;

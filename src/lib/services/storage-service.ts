@@ -2,7 +2,13 @@ import { storage } from '@/lib/firebase/config';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 export const storageService = {
-  async uploadProfileImage(userId: string, file: File) {
+  /**
+   * Sube una imagen de perfil al Storage
+   * @param userId - ID del usuario
+   * @param file - Archivo a subir
+   * @param currentImageUrl - URL de la imagen actual (opcional, para eliminarla antes de subir)
+   */
+  async uploadProfileImage(userId: string, file: File, currentImageUrl?: string | null) {
     try {
       if (!file.type.startsWith('image/')) {
         throw new Error('El archivo debe ser una imagen');
@@ -21,14 +27,12 @@ export const storageService = {
       // Normalizar extensiones comunes
       const normalizedExt = fileExt === 'jpeg' ? 'jpg' : fileExt;
 
-      // Eliminar imagen anterior si existe (buscar cualquier extensión común)
-      const commonExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'];
-      for (const ext of commonExtensions) {
+      // Solo eliminar imagen anterior si se proporciona una URL válida
+      if (currentImageUrl && currentImageUrl.includes('firebasestorage.googleapis.com')) {
         try {
-          const oldImageRef = ref(storage, `profiles/${userId}/profile.${ext}`);
-          await deleteObject(oldImageRef);
-        } catch (error) {
-          // Ignorar error si no existe imagen anterior
+          await this.deleteProfileImage(userId, currentImageUrl);
+        } catch {
+          // Ignorar silenciosamente - puede que la imagen ya no exista
         }
       }
 
@@ -56,15 +60,27 @@ export const storageService = {
   async deleteProfileImage(userId: string, imageUrl: string) {
     try {
       // Extraer el nombre del archivo de la URL
-      const fileName = imageUrl.split('/').pop()?.split('?')[0];
-      if (!fileName) return;
-  
-      const storageRef = ref(storage, `profiles/${userId}/${fileName}`);
+      // Decodificar la URL para manejar caracteres especiales
+      const decodedUrl = decodeURIComponent(imageUrl);
+      const pathMatch = decodedUrl.match(/profiles%2F[^?]+|profiles\/[^?]+/);
+      
+      if (!pathMatch) {
+        // Intentar extraer de otra forma
+        const fileName = imageUrl.split('/').pop()?.split('?')[0];
+        if (!fileName) return;
+        
+        const storageRef = ref(storage, `profiles/${userId}/${fileName}`);
+        await deleteObject(storageRef);
+        return;
+      }
+
+      // Usar el path extraído directamente
+      const path = pathMatch[0].replace('%2F', '/');
+      const storageRef = ref(storage, path);
       await deleteObject(storageRef);
     } catch (error: any) {
       if (error.code === 'storage/object-not-found') {
-        // Ignorar error si el archivo ya no existe
-        console.warn('Archivo ya no existe:', error);
+        // Ignorar silenciosamente si el archivo ya no existe
         return;
       }
       throw error;

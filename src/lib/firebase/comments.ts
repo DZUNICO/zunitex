@@ -6,15 +6,15 @@ import { logger } from '@/lib/utils/logger';
 
 export const commentService = {
   
-  async addComment(data: Omit<Comment, 'id'>) {
+  async addComment(data: Omit<Comment, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
       const docRef = await addDoc(collection(db, 'comments'), {
         projectId: data.projectId,
         userId: data.userId,
         userDisplayName: data.userDisplayName,
-        photoURL: data.photoURL,
+        photoURL: data.photoURL || null,
         content: data.content,
-        createdAt: serverTimestamp(), // Cambiado aquí
+        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
       return docRef.id;
