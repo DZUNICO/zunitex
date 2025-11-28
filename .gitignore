@@ -49,3 +49,6 @@ functions/.env
 # Firebase
 .firebaserc
 firebase-debug.log
+
+# Sentry Config File
+.env.sentry-build-plugin

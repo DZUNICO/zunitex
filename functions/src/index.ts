@@ -4,23 +4,26 @@ import "./config.js";
 
 // ===== IMPORTAR TRIGGERS =====
 // Post Likes
-export {onPostLike, onPostUnlike} from "./triggers/post-likes.js";
+export {onPostLikeCreate, onPostLikeDelete} from "./triggers/post-likes.js";
 
-// Blog Likes (cuando exista)
-// export { onBlogLike, onBlogUnlike } from './triggers/blog-likes';
+// Blog Likes
+export {onBlogLikeCreate, onBlogLikeDelete} from "./triggers/blog-likes.js";
 
-// Followers (cuando exista)
-// export { onFollowCreate, onFollowDelete } from './triggers/followers';
+// Resource Likes
+export {
+  onResourceLikeCreate,
+  onResourceLikeDelete,
+} from "./triggers/resource-likes.js";
 
-// Resource Likes (cuando exista)
-// export { onResourceLike, onResourceUnlike } from './triggers/resource-likes';
+// Followers
+export {onFollowerCreate, onFollowerDelete} from "./triggers/followers.js";
 
-// Reviews (cuando exista)
-// export {
-//   onReviewCreate,
-//   onReviewUpdate,
-//   onReviewDelete
-// } from './triggers/reviews';
+// Reviews
+export {
+  onReviewCreate,
+  onReviewUpdate,
+  onReviewDelete,
+} from "./triggers/reviews.js";
 
 console.log("🚀 Cloud Functions STARLOGIC iniciadas");
 

@@ -13,10 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCreateCommunityPost, useUserProfile } from '@/lib/react-query/queries';
+import { useCreateCommunityPost } from '@/lib/react-query/queries';
 import { useAuth } from '@/lib/context/auth-context';
 import type { PostCategory } from '@/types/community';
-import { Image as ImageIcon, X, Send, Hash, ChevronDown } from 'lucide-react';
+import { Image as ImageIcon, X, Send, Hash } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase/config';
@@ -34,7 +34,6 @@ const categories = [
 
 export function CreatePostForm({ onSuccess }: { onSuccess?: () => void }) {
   const { user } = useAuth();
-  const { data: profile } = useUserProfile();
   const { toast } = useToast();
   const createPostMutation = useCreateCommunityPost();
   
@@ -144,7 +143,7 @@ export function CreatePostForm({ onSuccess }: { onSuccess?: () => void }) {
         category: category as PostCategory,
         tags,
         images: images.length > 0 ? images : undefined,
-        userRole: 'technician', // Valor por defecto, ya que profile.role es 'admin' | 'user' y no coincide con UserRole
+        userRole: 'technician', // Valor por defecto
         isPinned: false,
       });
 
@@ -157,7 +156,7 @@ export function CreatePostForm({ onSuccess }: { onSuccess?: () => void }) {
       
       // El toast de éxito ya se maneja en el hook useCreateCommunityPost
       onSuccess?.();
-    } catch (error) {
+    } catch (_error) {
       // Error manejado en el hook
     } finally {
       setIsSubmitting(false);

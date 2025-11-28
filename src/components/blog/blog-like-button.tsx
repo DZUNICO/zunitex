@@ -33,7 +33,7 @@ export function BlogLikeButton({
         postId,
         like: !isLiked,
       });
-    } catch (error) {
+    } catch (_error) {
       // El error ya se maneja en el hook
     }
   };

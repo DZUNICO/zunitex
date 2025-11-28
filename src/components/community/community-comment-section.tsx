@@ -36,7 +36,7 @@ export function CommunityCommentSection({ postId }: CommunityCommentSectionProps
         content: commentContent.trim(),
       });
       setCommentContent('');
-    } catch (error) {
+    } catch (_error) {
       // El error ya se maneja en el hook
     } finally {
       setIsSubmitting(false);

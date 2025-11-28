@@ -1,10 +1,11 @@
 'use client';
 
+import { Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader } from '@/components/ui/loader';
 
-export function NavigationProgress() {
+function NavigationProgressContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isNavigating, setIsNavigating] = useState(false);
@@ -35,4 +36,12 @@ export function NavigationProgress() {
   }, [pathname, searchParams]); // Se ejecuta cuando cambia la ruta o los parámetros
 
   return isNavigating ? <Loader /> : null;
+}
+
+export function NavigationProgress() {
+  return (
+    <Suspense fallback={null}>
+      <NavigationProgressContent />
+    </Suspense>
+  );
 }

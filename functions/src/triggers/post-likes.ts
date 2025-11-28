@@ -6,7 +6,7 @@ import {incrementCounter, documentExists} from "../utils/firestore-helpers.js";
  * Trigger: onCreate en collection post-likes
  * Acción: Incrementa community-posts/{postId}.likes
  */
-export const onPostLike = functions.firestore
+export const onPostLikeCreate = functions.firestore
   .document("post-likes/{likeId}")
   .onCreate(async (snap) => {
     try {
@@ -30,7 +30,7 @@ export const onPostLike = functions.firestore
 
       console.log(`Like added to post ${postId} by user ${userId}`);
     } catch (error) {
-      console.error("Error in onPostLike:", error);
+      console.error("Error in onPostLikeCreate:", error);
       throw error;
     }
   });
@@ -40,7 +40,7 @@ export const onPostLike = functions.firestore
  * Trigger: onDelete en collection post-likes
  * Acción: Decrementa community-posts/{postId}.likes
  */
-export const onPostUnlike = functions.firestore
+export const onPostLikeDelete = functions.firestore
   .document("post-likes/{likeId}")
   .onDelete(async (snap) => {
     try {
@@ -64,7 +64,7 @@ export const onPostUnlike = functions.firestore
 
       console.log(`Like removed from post ${postId} by user ${userId}`);
     } catch (error) {
-      console.error("Error in onPostUnlike:", error);
+      console.error("Error in onPostLikeDelete:", error);
       throw error;
     }
   });

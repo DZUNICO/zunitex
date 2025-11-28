@@ -335,7 +335,7 @@ export const communityService = {
       
       const commentRef = await addDoc(collection(db, 'post-comments'), {
         ...cleanData,
-        likes: 0,
+        // ✅ NO incluir 'likes' aquí - se manejará por separado si es necesario
         createdAt: serverTimestamp(),
       });
 

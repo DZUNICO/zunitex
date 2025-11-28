@@ -3,6 +3,8 @@
  * Reemplaza todos los console.log/error/warn del proyecto
  */
 
+import * as Sentry from '@sentry/nextjs';
+
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
 interface LogContext {
@@ -30,17 +32,41 @@ class Logger {
 
     switch (level) {
       case 'error':
-        // En producción, enviar a servicio de logging externo
+        // Capturar en Sentry
         if (error) {
+          Sentry.captureException(error, {
+            tags: { context: context?.component || context?.action },
+            extra: { message, ...context },
+            level: 'error',
+          });
           console.error(formattedMessage, error);
         } else {
+          Sentry.captureException(new Error(message), {
+            tags: { context: context?.component || context?.action },
+            extra: context,
+            level: 'error',
+          });
           console.error(formattedMessage);
         }
         break;
       case 'warn':
+        // Enviar breadcrumb a Sentry
+        Sentry.addBreadcrumb({
+          category: context?.component || 'warning',
+          message,
+          level: 'warning',
+          data: context,
+        });
         console.warn(formattedMessage);
         break;
       case 'info':
+        // Enviar breadcrumb a Sentry
+        Sentry.addBreadcrumb({
+          category: context?.component || 'info',
+          message,
+          level: 'info',
+          data: context,
+        });
         if (this.isDevelopment) {
           console.info(formattedMessage);
         }

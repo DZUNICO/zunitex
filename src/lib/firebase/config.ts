@@ -18,6 +18,10 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// ✅ EMULADORES DESHABILITADOS - Usando Firestore de producción
+// Para volver a usar emuladores, descomentar el bloque de abajo
+
+/*
 // Conectar a emuladores en desarrollo local
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   // Solo conectar una vez
@@ -50,5 +54,8 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   //   console.log('Storage emulator ya está conectado o no disponible');
   // }
 }
+*/
+
+console.log('🔥 Firebase conectado a producción');
 
 export { app, auth, db, storage };

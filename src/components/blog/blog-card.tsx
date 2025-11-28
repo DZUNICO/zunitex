@@ -4,11 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Heart, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { BlogPost } from '@/types/blog';
 import { BlogLikeButton } from './blog-like-button';
-import { useMemo } from 'react';
 
 interface BlogCardProps {
   post: BlogPost;
@@ -23,8 +23,8 @@ export function BlogCard({ post, featured = false }: BlogCardProps) {
         addSuffix: true,
         locale: es
       });
-    } catch (error) {
-      console.error('Error formateando fecha:', error);
+    } catch (_error) {
+      console.error('Error formateando fecha:', _error);
       return 'Fecha no disponible';
     }
   };
@@ -35,12 +35,15 @@ export function BlogCard({ post, featured = false }: BlogCardProps) {
     }`}>
       <Link href={`/blog/${post.id}`} className="block">
         <div className={`relative ${featured ? 'h-full min-h-[300px] aspect-[16/9]' : 'aspect-[16/9]'}`}>
-          <img
+          <Image
             src={post.imageUrl || '/placeholder.jpg'}
             alt={post.title}
-            className="object-scale-down w-full h-full"
+            fill
+            className="object-cover"
+            loading="lazy"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
-          <div className="absolute top-4 left-4">
+          <div className="absolute top-4 left-4 z-10">
             <Badge className="bg-white/90 text-black hover:bg-white/80">
               {post.category}
             </Badge>

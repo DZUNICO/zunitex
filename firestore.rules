@@ -42,10 +42,14 @@ service cloud.firestore {
                        (
                          // Permitir actualizar solo lastLogin
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin']) ||
-                         // O permitir actualizar campos del perfil excepto email y createdAt
-                         // Los usuarios pueden actualizar: displayName, location, about, specialties, role, photoURL, updatedAt, lastLogin
-                         !('email' in request.resource.data.diff(resource.data).affectedKeys()) &&
-                         !('createdAt' in request.resource.data.diff(resource.data).affectedKeys()) &&
+                         // O permitir actualizar campos del perfil excepto campos protegidos
+                         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                           'email', 
+                           'createdAt',
+                           'followersCount',    // Manejado por Cloud Functions
+                           'followingCount',    // Manejado por Cloud Functions
+                           'projectsCount'      // Si existe, también protegido
+                         ]) &&
                          // Asegurar que role solo puede ser uno de los valores permitidos si se actualiza
                          (!('role' in request.resource.data.diff(resource.data).affectedKeys()) ||
                           (request.resource.data.role != null && 
@@ -58,7 +62,7 @@ service cloud.firestore {
     // PROJECTS COLLECTION
     // ============================================================================
     match /projects/{projectId} {
-      allow read: if isAuthenticated();
+      allow read: if true; // Portafolios públicos
       allow create: if isAuthenticated() &&
                        request.resource.data.createdBy == request.auth.uid &&
                        // Verificar campos requeridos (permitir campos opcionales adicionales)
@@ -89,10 +93,14 @@ service cloud.firestore {
     // COMMENTS COLLECTION (Project Comments)
     // ============================================================================
     match /comments/{commentId} {
-      allow read: if isAuthenticated();
+      allow read: if true; // Comentarios públicos
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid &&
-                       request.resource.data.keys().hasAll(['projectId', 'userId', 'userDisplayName', 'content', 'createdAt']) &&
+                       // Verificar campos requeridos (createdAt puede ser serverTimestamp)
+                       'projectId' in request.resource.data &&
+                       'userId' in request.resource.data &&
+                       'userDisplayName' in request.resource.data &&
+                       'content' in request.resource.data &&
                        request.resource.data.content is string &&
                        request.resource.data.content.size() > 0 &&
                        request.resource.data.content.size() <= 1000;
@@ -112,14 +120,19 @@ service cloud.firestore {
       allow read: if true; // Posts públicos pueden ser leídos por cualquiera
       allow create: if isAuthenticated() &&
                        request.resource.data.authorId == request.auth.uid &&
+                       isAdmin() &&
                        request.resource.data.keys().hasAll(['title', 'content', 'summary', 'category', 'authorId', 'authorName', 'status', 'createdAt', 'likesCount', 'commentsCount']) &&
                        request.resource.data.status in ['published', 'draft'] &&
                        request.resource.data.likesCount == 0 &&
                        request.resource.data.commentsCount == 0;
       allow update: if isAuthenticated() &&
                        (resource.data.authorId == request.auth.uid || isAdmin()) &&
-                       !('authorId' in request.resource.data.diff(resource.data).affectedKeys()) &&
-                       !('createdAt' in request.resource.data.diff(resource.data).affectedKeys());
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                         'authorId', 
+                         'createdAt', 
+                         'likesCount', 
+                         'commentsCount'
+                       ]);
       allow delete: if isAuthenticated() &&
                        (resource.data.authorId == request.auth.uid || isAdmin());
     }
@@ -131,13 +144,17 @@ service cloud.firestore {
       allow read: if true; // Comentarios públicos
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid &&
-                       request.resource.data.keys().hasAll(['postId', 'userId', 'userName', 'content', 'createdAt']) &&
+                       // Verificar campos requeridos (createdAt puede ser serverTimestamp)
+                       'postId' in request.resource.data &&
+                       'userId' in request.resource.data &&
+                       'userName' in request.resource.data &&
+                       'content' in request.resource.data &&
                        request.resource.data.content is string &&
                        request.resource.data.content.size() > 0 &&
-                       request.resource.data.content.size() <= 1000 &&
-                       request.resource.data.likes == 0;
+                       request.resource.data.content.size() <= 1000;
       allow update: if isAuthenticated() &&
                        (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       request.resource.data.content is string &&
                        request.resource.data.content.size() > 0 &&
                        request.resource.data.content.size() <= 1000;
       allow delete: if isAuthenticated() &&
@@ -204,9 +221,8 @@ service cloud.firestore {
     // RESOURCES COLLECTION
     // ============================================================================
     match /resources/{resourceId} {
-      allow read: if isAuthenticated() && 
-                      (resource.data.isPublic == true || resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() &&
+      allow read: if resource.data.isPublic == true || isAdmin(); // Públicos si isPublic=true
+      allow create: if isAuthenticated() && isAdmin() &&
                        request.resource.data.userId == request.auth.uid &&
                        request.resource.data.keys().hasAll(['userId', 'userName', 'title', 'description', 'category', 'fileUrl', 'fileName', 'fileSize', 'fileType', 'tags', 'isPublic', 'isPremium', 'createdAt', 'downloads', 'likes', 'views']) &&
                        request.resource.data.category in ['diagram', 'document', 'photo', 'video', 'tool', 'guide'] &&
@@ -217,8 +233,13 @@ service cloud.firestore {
                        request.resource.data.fileSize <= 100 * 1024 * 1024; // Max 100MB
       allow update: if isAuthenticated() &&
                        (resource.data.userId == request.auth.uid || isAdmin()) &&
-                       !('userId' in request.resource.data.diff(resource.data).affectedKeys()) &&
-                       !('createdAt' in request.resource.data.diff(resource.data).affectedKeys());
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                         'userId', 
+                         'createdAt', 
+                         'likes', 
+                         'downloads', 
+                         'views'
+                       ]);
       allow delete: if isAuthenticated() &&
                        (resource.data.userId == request.auth.uid || isAdmin());
     }
@@ -240,7 +261,8 @@ service cloud.firestore {
     // ============================================================================
     match /community-posts/{postId} {
       // Permitir lectura individual y listas (read incluye get y list)
-      allow read: if isAuthenticated();
+      // Lectura pública para todos
+      allow read: if true;
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid &&
                        // Verificar campos requeridos (permitir campos opcionales adicionales)
@@ -262,20 +284,15 @@ service cloud.firestore {
                        request.resource.data.views == 0 &&
                        request.resource.data.isPinned == false;
       allow update: if isAuthenticated() &&
-                       (
-                         // Permitir actualizar contadores (commentsCount, likes, views) a cualquier usuario autenticado
-                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']) ||
-                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) ||
-                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']) ||
-                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount', 'likes']) ||
-                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount', 'views']) ||
-                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'views']) ||
-                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount', 'likes', 'views'])) ||
-                         // O permitir actualizar otros campos si eres el dueño o admin
-                         ((resource.data.userId == request.auth.uid || isAdmin()) &&
-                          !('userId' in request.resource.data.diff(resource.data).affectedKeys()) &&
-                          !('createdAt' in request.resource.data.diff(resource.data).affectedKeys()))
-                       );
+                       resource.data.userId == request.auth.uid &&
+                       // NO permitir modificar contadores (manejados por Cloud Functions)
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                         'likes', 
+                         'commentsCount', 
+                         'views', 
+                         'userId', 
+                         'createdAt'
+                       ]);
       allow delete: if isAuthenticated() &&
                        (resource.data.userId == request.auth.uid || isAdmin());
     }
@@ -285,21 +302,21 @@ service cloud.firestore {
     // ============================================================================
     match /post-comments/{commentId} {
       // Permitir lectura individual y listas (read incluye get y list)
-      allow read: if isAuthenticated();
+      // Comentarios públicos también
+      allow read: if true;
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid &&
-                       // Verificar campos requeridos (permitir campos opcionales adicionales)
+                       // Verificar campos requeridos (createdAt puede ser serverTimestamp)
                        'postId' in request.resource.data &&
                        'userId' in request.resource.data &&
                        'userName' in request.resource.data &&
                        'content' in request.resource.data &&
-                       'createdAt' in request.resource.data &&
                        request.resource.data.content is string &&
                        request.resource.data.content.size() > 0 &&
-                       request.resource.data.content.size() <= 1000 &&
-                       request.resource.data.likes == 0;
+                       request.resource.data.content.size() <= 1000;
       allow update: if isAuthenticated() &&
                        (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       request.resource.data.content is string &&
                        request.resource.data.content.size() > 0 &&
                        request.resource.data.content.size() <= 1000;
       allow delete: if isAuthenticated() &&
@@ -310,7 +327,8 @@ service cloud.firestore {
     // POST LIKES COLLECTION (Community)
     // ============================================================================
     match /post-likes/{likeId} {
-      allow read: if isAuthenticated();
+      // Permitir ver quién dio like (lectura pública)
+      allow read: if true;
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid &&
                        request.resource.data.keys().hasAll(['postId', 'userId', 'createdAt']);

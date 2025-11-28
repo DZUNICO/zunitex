@@ -6,7 +6,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/context/auth-context';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { logger } from '@/lib/utils/logger';
 import type { Comment } from '@/types/comment'; // Asegúrate de tener este archivo
 import Link from 'next/link';
 
@@ -17,7 +16,7 @@ interface CommentSectionProps {
 }
 
 export function CommentSection({ 
-  projectId, 
+  projectId: _projectId, 
   comments, 
   onAddComment 
 }: CommentSectionProps) {
@@ -44,8 +43,8 @@ export function CommentSection({
         addSuffix: true,
         locale: es
       });
-    } catch (error) {
-      console.error('Error formateando fecha:', error);
+    } catch (_error) {
+      console.error('Error formateando fecha:', _error);
       return 'Fecha no disponible';
     }
   };

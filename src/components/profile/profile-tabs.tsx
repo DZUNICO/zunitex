@@ -86,8 +86,8 @@ function ProjectCard({ project }: ProjectCardProps) {
         month: 'long',
         day: 'numeric'
       });
-    } catch (error) {
-      console.error('Error formatting date:', error, date);
+    } catch (_error) {
+      console.error('Error formatting date:', _error, date);
       return 'Fecha inválida';
     }
   };

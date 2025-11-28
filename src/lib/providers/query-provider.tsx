@@ -1,13 +1,32 @@
 'use client';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
+        // Capturar errores de queries automáticamente
+        queryCache: new QueryCache({
+          onError: (error) => {
+            Sentry.captureException(error, {
+              tags: { type: 'query_error' },
+              level: 'error',
+            });
+          },
+        }),
+        // Capturar errores de mutations automáticamente
+        mutationCache: new MutationCache({
+          onError: (error) => {
+            Sentry.captureException(error, {
+              tags: { type: 'mutation_error' },
+              level: 'error',
+            });
+          },
+        }),
         defaultOptions: {
           queries: {
             // Configuración por defecto para queries

@@ -5,6 +5,8 @@ import { AuthProvider } from '@/lib/context/auth-context';
 import { QueryProvider } from '@/lib/providers/query-provider';
 import { NavigationProgress } from '@/components/providers/navigation-progress';
 import { GlobalErrorBoundary } from '@/components/shared/global-error-boundary';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -33,6 +35,8 @@ export default function RootLayout({
             </AuthProvider>
           </QueryProvider>
         </GlobalErrorBoundary>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
