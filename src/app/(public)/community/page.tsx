@@ -7,12 +7,14 @@ import { CreatePostForm } from '@/components/community/create-post-form';
 import { CommunitySidebar } from '@/components/community/community-sidebar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Sparkles, Clock, TrendingUp } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Sparkles, Clock, TrendingUp, AlertCircle } from 'lucide-react';
 import type { CommunityFilters } from '@/types/community';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { FeedErrorFallback } from '@/components/shared/error-fallbacks';
+import { QUERY_LIMITS, QUERY_MESSAGES } from '@/lib/react-query/constants';
 
 function CommunityContent() {
   const queryClient = useQueryClient();
@@ -45,6 +47,9 @@ function CommunityContent() {
   } = useCommunityPosts(sortBy === 'hot' ? hotFilters : recentFilters);
 
   const posts = data?.pages.flatMap(page => page.posts) || [];
+  
+  // Validación de límite de páginas
+  const isNearLimit = (data?.pages.length || 0) >= 9; // 9 de 10 páginas
   
   // Ordenar posts: destacados por likes y engagement, recientes por fecha
   const sortedPosts = useMemo(() => {
@@ -153,15 +158,26 @@ function CommunityContent() {
                         ))}
                       </div>
 
+                      {isNearLimit && (
+                        <Alert className="mt-4">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {QUERY_MESSAGES.NEAR_LIMIT}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
                       {hasNextPage && (
                         <div className="flex justify-center pt-6">
                           <Button
                             onClick={() => fetchNextPage()}
-                            disabled={isFetchingNextPage}
+                            disabled={isFetchingNextPage || isNearLimit}
                             variant="outline"
                             className="w-full max-w-md"
                           >
-                            {isFetchingNextPage ? (
+                            {isNearLimit ? (
+                              `Límite alcanzado (${QUERY_LIMITS.MAX_ITEMS} items)`
+                            ) : isFetchingNextPage ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Cargando...
@@ -198,15 +214,26 @@ function CommunityContent() {
                         ))}
                       </div>
 
+                      {isNearLimit && (
+                        <Alert className="mt-4">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {QUERY_MESSAGES.NEAR_LIMIT}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
                       {hasNextPage && (
                         <div className="flex justify-center pt-6">
                           <Button
                             onClick={() => fetchNextPage()}
-                            disabled={isFetchingNextPage}
+                            disabled={isFetchingNextPage || isNearLimit}
                             variant="outline"
                             className="w-full max-w-md"
                           >
-                            {isFetchingNextPage ? (
+                            {isNearLimit ? (
+                              `Límite alcanzado (${QUERY_LIMITS.MAX_ITEMS} items)`
+                            ) : isFetchingNextPage ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Cargando...

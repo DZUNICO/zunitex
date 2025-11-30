@@ -156,7 +156,7 @@ export function RegisterForm() {
                         {...field} 
                         type="tel" 
                         className="h-11" 
-                        placeholder="+51912345678"
+                        placeholder="912345678"
                       />
                     </FormControl>
                     <FormMessage />

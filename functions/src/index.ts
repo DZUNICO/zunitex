@@ -25,6 +25,9 @@ export {
   onReviewDelete,
 } from "./triggers/reviews.js";
 
+// Scheduled Backups
+export { scheduledFirestoreBackup } from "./scheduled/backup.js";
+
 console.log("🚀 Cloud Functions STARLOGIC iniciadas");
 
 

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "backup": "bash scripts/backup-firestore.sh",
+    "backup:restore": "bash scripts/restore-firestore.sh",
+    "backup:setup": "bash scripts/setup-backup-bucket.sh",
+    "backup:list": "gsutil ls -lh gs://zunitex-47e0a-backups/firestore-backups/"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

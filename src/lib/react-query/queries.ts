@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/utils/logger';
 import { getFirebaseErrorMessage } from '@/lib/utils/logger';
+import { QUERY_LIMITS } from './constants';
 
 // Services
 import { projectsService } from '@/lib/firebase/projects';
@@ -156,8 +157,9 @@ export function useProjects(filters?: ProjectFilters) {
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: null as QueryDocumentSnapshot | null,
-    staleTime: 5 * 60 * 1000, // 5 minutos - datos relativamente estáticos
-    gcTime: 10 * 60 * 1000, // 10 minutos en caché
+    maxPages: QUERY_LIMITS.MAX_PAGES,
+    staleTime: QUERY_LIMITS.STALE_TIME,
+    gcTime: QUERY_LIMITS.GC_TIME,
   });
 }
 
@@ -556,8 +558,9 @@ export function useBlogPosts(filters?: BlogFilters) {
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: 0,
-    staleTime: 10 * 60 * 1000, // 10 minutos - posts del blog son muy estáticos
-    gcTime: 30 * 60 * 1000, // 30 minutos en caché
+    maxPages: QUERY_LIMITS.MAX_PAGES,
+    staleTime: QUERY_LIMITS.STALE_TIME,
+    gcTime: QUERY_LIMITS.GC_TIME,
   });
 }
 
@@ -1065,8 +1068,9 @@ export function useResources(filters?: ResourceFilters) {
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: null as QueryDocumentSnapshot | null,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    gcTime: 15 * 60 * 1000, // 15 minutos en caché
+    maxPages: QUERY_LIMITS.MAX_PAGES,
+    staleTime: QUERY_LIMITS.STALE_TIME,
+    gcTime: QUERY_LIMITS.GC_TIME,
   });
 }
 
@@ -1151,8 +1155,9 @@ export function useReviews(filters?: ReviewFilters) {
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: null as QueryDocumentSnapshot | null,
-    staleTime: 3 * 60 * 1000, // 3 minutos - reviews pueden cambiar
-    gcTime: 10 * 60 * 1000, // 10 minutos en caché
+    maxPages: QUERY_LIMITS.MAX_PAGES,
+    staleTime: QUERY_LIMITS.STALE_TIME,
+    gcTime: QUERY_LIMITS.GC_TIME,
   });
 }
 
@@ -1264,8 +1269,9 @@ export function useCommunityPosts(filters?: CommunityFilters) {
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: null as QueryDocumentSnapshot | null,
-    staleTime: 3 * 60 * 1000, // 3 minutos
-    gcTime: 10 * 60 * 1000, // 10 minutos en caché
+    maxPages: QUERY_LIMITS.MAX_PAGES,
+    staleTime: QUERY_LIMITS.STALE_TIME,
+    gcTime: QUERY_LIMITS.GC_TIME,
   });
 }
 
