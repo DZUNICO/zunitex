@@ -1,5 +1,7 @@
 // Tipo base para usuario
-  export interface BaseProfile {
+import { UserRole } from './roles';
+
+export interface BaseProfile {
     displayName: string;
     email: string;
     about?: string;
@@ -15,7 +17,7 @@
   export interface UserProfile extends BaseProfile {
     id?: string;
     phone: string;
-    role: 'admin' | 'user';
+    role: UserRole;  // Actualizado para usar el tipo completo de roles
     photoURL?: string;  // Campo original de avatar
     certifications?: string[];
   }

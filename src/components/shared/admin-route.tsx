@@ -1,22 +1,41 @@
+// src/components/shared/admin-route.tsx
+
 'use client';
 
 import { useAuth } from '@/lib/context/auth-context';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
-// Lista de correos autorizados
-const ADMIN_EMAILS = ['diego.zuni@gmail.com']; // Reemplaza con tu correo
+interface AdminRouteProps {
+  children: React.ReactNode;
+}
 
-export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+export function AdminRoute({ children }: AdminRouteProps) {
+  const { user, isAdmin, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    if (!loading && (!user || !ADMIN_EMAILS.includes(user.email!))) {
-      redirect('/dashboard');
+    if (!loading) {
+      if (!user) {
+        router.push('/login');
+      } else if (!isAdmin) {
+        router.push('/');
+      }
     }
-  }, [user, loading]);
+  }, [user, isAdmin, loading, router]);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user || !isAdmin) {
+    return null;
+  }
 
   return <>{children}</>;
 }

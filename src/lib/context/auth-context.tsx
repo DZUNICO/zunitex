@@ -1,95 +1,106 @@
+// src/lib/context/auth-context.tsx
+
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { 
+import {
   User,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  updateProfile,
   setPersistence,
   browserLocalPersistence
 } from 'firebase/auth';
+import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
-import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
-import { logger } from '@/lib/utils/logger';
+import { DEFAULT_ROLE, DEFAULT_USER_TYPE, UserRole } from '@/types/roles';
+import { useCustomClaims } from '@/hooks/useCustomClaims';
 
 interface AuthContextType {
   user: User | null;
+  userRole: UserRole | null;
+  isAdmin: boolean;
   loading: boolean;
   signUp: (email: string, password: string, displayName: string, phone: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshToken: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authInitialized, setAuthInitialized] = useState(false);
+  
+  // Obtener custom claims
+  const { claims, loading: claimsLoading } = useCustomClaims(user);
 
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-        
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            try {
-              // Usar updateDoc en lugar de setDoc para evitar problemas con reglas
-              const userDocRef = doc(db, 'users', user.uid);
-              const userDoc = await getDoc(userDocRef);
-              
-              if (userDoc.exists()) {
-                // Si el documento existe, actualizar solo lastLogin
-                await updateDoc(userDocRef, {
-                  lastLogin: new Date().toISOString()
-                });
-              }
-              // Si no existe, se creará en el registro (signUp)
-              setUser(user);
-            } catch (error) {
-              logger.error('Error updating last login', error as Error, { userId: user.uid });
-            }
-          } else {
-            setUser(null);
-          }
-          setLoading(false);
-          setAuthInitialized(true);
-        });
+    // Configurar persistencia
+    setPersistence(auth, browserLocalPersistence);
 
-        return () => unsubscribe();
-      } catch (error) {
-        logger.error('Error initializing auth', error as Error);
-        setLoading(false);
-        setAuthInitialized(true);
+    // Listener de cambios de autenticación
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setUser(user);
+      
+      if (user) {
+        // Actualizar lastLogin en Firestore
+        try {
+          await updateDoc(doc(db, 'users', user.uid), {
+            lastLogin: serverTimestamp()
+          });
+        } catch (error) {
+          console.error('Error actualizando lastLogin:', error);
+        }
       }
-    };
+      
+      setLoading(false);
+    });
 
-    initAuth();
+    return unsubscribe;
   }, []);
 
-  // Mantener el resto de tus funciones exactamente igual
-  const signUp = async (email: string, password: string, displayName: string, phone: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    displayName: string,
+    phone: string
+  ) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // Crear usuario en Authentication
+      const result = await createUserWithEmailAndPassword(auth, email, password);
       
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
+      // Actualizar perfil
+      await updateProfile(result.user, { displayName });
+
+      // Crear documento en Firestore
+      // NOTA: onUserCreate Cloud Function también creará esto, pero lo hacemos aquí
+      // para asegurar que existe inmediatamente
+      await setDoc(doc(db, 'users', result.user.uid), {
+        uid: result.user.uid,
         email,
         displayName,
         phone,
-        role: 'user',
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString(),
-        projectsCount: 0,
-        rating: 0,
-        specialties: [],
-        photoURL: null,
-        active: true
-      });
-    } catch (error) {
-      logger.error('Error en registro', error as Error, { email });
+        role: DEFAULT_ROLE, // 'user'
+        userType: DEFAULT_USER_TYPE, // 'general'
+        verificationStatus: null,
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp(),
+        followersCount: 0,
+        followingCount: 0,
+        projectsCount: 0
+      }, { merge: true });
+
+      // Los custom claims se establecerán automáticamente por onUserCreate
+    } catch (error: any) {
+      console.error('Error en signUp:', error);
       throw error;
     }
   };
@@ -97,8 +108,8 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      logger.error('Error en inicio de sesión', error as Error, { email });
+    } catch (error: any) {
+      console.error('Error en signIn:', error);
       throw error;
     }
   };
@@ -106,36 +117,43 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     try {
       await signOut(auth);
-    } catch (error) {
-      logger.error('Error en cierre de sesión', error as Error);
+      setUser(null);
+    } catch (error: any) {
+      console.error('Error en logout:', error);
       throw error;
     }
   };
 
-  if (!authInitialized) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4">Cargando...</p>
-        </div>
-      </div>
-    );
-  }
+  const refreshToken = async () => {
+    if (!user) return;
+    
+    try {
+      // Forzar refresh del token
+      await user.getIdToken(true);
+      
+      // Opcional: llamar a la Cloud Function para asegurar sincronización
+      // const functions = getFunctions();
+      // const refreshFn = httpsCallable(functions, 'refreshUserToken');
+      // await refreshFn();
+    } catch (error) {
+      console.error('Error refrescando token:', error);
+    }
+  };
+
+  const value = {
+    user,
+    userRole: claims?.role || null,
+    isAdmin: claims?.admin || false,
+    loading: loading || claimsLoading,
+    signUp,
+    signIn,
+    logout,
+    refreshToken
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth debe ser usado dentro de un AuthProvider');
-  }
-  return context;
-};
-
-export { AuthProvider, useAuth };
+}

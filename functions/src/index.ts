@@ -26,7 +26,12 @@ export {
 } from "./triggers/reviews.js";
 
 // Scheduled Backups
-export { scheduledFirestoreBackup } from "./scheduled/backup.js";
+// TEMPORALMENTE COMENTADO - Descomentar cuando se configure bucket
+// export {scheduledFirestoreBackup} from "./scheduled/backup.js";
+
+// NUEVAS EXPORTACIONES - Custom Claims
+export {onUserCreate, onUserDocumentUpdate} from "./triggers/user-claims.js";
+export {refreshUserToken} from "./callable/refresh-token.js";
 
 console.log("🚀 Cloud Functions STARLOGIC iniciadas");
 
