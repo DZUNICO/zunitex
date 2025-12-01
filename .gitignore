@@ -54,3 +54,4 @@ firebase-debug.log
 .env.sentry-build-plugin
 
 .vercel
+serviceAccountKey.json 
