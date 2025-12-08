@@ -8,12 +8,8 @@ import type { Project, CreateProjectData } from '@/types/project';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ProjectForm from '@/components/projects/project-form';
 import { useRouter } from 'next/navigation';
-import { 
-  useUserProjects, 
-  useCreateProject, 
-  useUpdateProject, 
-  useDeleteProject 
-} from '@/lib/react-query/queries';
+import { useUserProjects } from '@/lib/react-query/queries/use-project-queries';
+import { useCreateProject, useUpdateProject, useDeleteProject } from '@/lib/react-query/mutations/use-project-mutations';
 
 export default function ProjectsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

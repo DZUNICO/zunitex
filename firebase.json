@@ -20,9 +20,12 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
-  "storage": {
-    "rules": "storage.rules"
-  }
+  "storage": [
+    {
+      "bucket": "zunitex-47e0a.firebasestorage.app",
+      "rules": "storage.rules"
+    }
+  ]
 }
 
 

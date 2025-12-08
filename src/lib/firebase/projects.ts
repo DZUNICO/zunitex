@@ -90,10 +90,13 @@ export const projectsService = {
         return {
           id: doc.id,
           ...data,
+          // Asegurar que images y tags estén presentes
+          images: data.images || [],
+          tags: data.tags || [],
           // Convertir Timestamp de Firestore a Date
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt || Date.now())),
           startDate: data.startDate?.toDate ? data.startDate.toDate() : (data.startDate instanceof Date ? data.startDate : data.startDate ? new Date(data.startDate) : undefined)
-        };
+        } as Project;
       });
     } catch (error) {
       logger.error('Error fetching projects', error as Error, { userId });
@@ -161,9 +164,13 @@ export const projectsService = {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
+        const data = docSnap.data();
         return {
           id: docSnap.id,
-          ...docSnap.data()
+          ...data,
+          // Asegurar que images y tags estén presentes
+          images: data.images || [],
+          tags: data.tags || [],
         } as Project;
       }
       return null;

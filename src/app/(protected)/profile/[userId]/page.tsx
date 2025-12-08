@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/auth-context';
-import { useUserProfileById } from '@/lib/react-query/queries';
+import { useUserProfileById } from '@/lib/react-query/queries/use-user-queries';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { ProfileSidebar } from '@/components/profile/profile-sidebar';
 import { ProfileTabs } from '@/components/profile/profile-tabs';

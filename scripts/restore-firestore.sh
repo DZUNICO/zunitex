@@ -51,3 +51,7 @@ firebase firestore:import "${BACKUP_PATH}" \
 
 echo "✅ Restore completado exitosamente"
 
+
+
+
+

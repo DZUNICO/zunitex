@@ -10,7 +10,8 @@ import { communityService } from "@/lib/firebase/community";
 import { logger } from "@/lib/utils/logger";
 import { getFirebaseErrorMessage } from "@/lib/utils/logger";
 import { useUserProfile } from "../queries/use-user-queries";
-import type { CommunityPost, UserProfile } from "@/types/community";
+import type { CommunityPost, PostComment } from "@/types/community";
+import type { UserProfile } from "@/types/profile";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 /**
@@ -90,23 +91,90 @@ export function useAddCommunityComment() {
         queryKeys.profile.detail(user.uid)
       ) || profile;
 
-      return await communityService.addPostComment({
+      // Verificar que userId esté presente antes de crear el comentario
+      const commentData = {
         postId,
-        userId: user.uid,
+        userId: user.uid, // ✅ CRÍTICO: Debe ser user.uid
         userName: currentProfile?.displayName || user.displayName || 'Usuario',
         userAvatar: currentProfile?.photoURL || user.photoURL || undefined,
         content,
-      });
+      };
+
+      // Log de depuración en desarrollo
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('Creating post comment', {
+          component: 'useAddCommunityComment',
+          action: 'mutationFn',
+          postId,
+          userId: commentData.userId,
+          hasUserId: !!commentData.userId,
+        });
+      }
+
+      return await communityService.addPostComment(commentData);
+    },
+    retry: false, // Deshabilitar retry para evitar comentarios duplicados
+    onMutate: async ({ postId, content }) => {
+      // Cancelar queries en curso para evitar sobrescritura
+      await queryClient.cancelQueries({ queryKey: queryKeys.community.commentsList(postId) });
+
+      // Obtener perfil para el comentario optimista
+      const currentProfile = queryClient.getQueryData<UserProfile>(
+        queryKeys.profile.detail(user?.uid || '')
+      ) || profile;
+
+      // Snapshot del estado anterior
+      const previousComments = queryClient.getQueryData<PostComment[]>(
+        queryKeys.community.commentsList(postId)
+      );
+
+      // Crear comentario optimista
+      if (user?.uid && currentProfile) {
+        const optimisticComment: PostComment = {
+          id: 'temp-' + Date.now(),
+          postId,
+          userId: user.uid,
+          userName: currentProfile.displayName || user.displayName || 'Usuario',
+          userAvatar: currentProfile.photoURL || user.photoURL || undefined,
+          content,
+          likes: 0,
+          createdAt: new Date(),
+        };
+
+        // Actualización optimista inmediata
+        queryClient.setQueryData<PostComment[]>(
+          queryKeys.community.commentsList(postId),
+          (old) => old ? [optimisticComment, ...old] : [optimisticComment]
+        );
+      }
+
+      return { previousComments };
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.community.commentsList(variables.postId) });
+      // Invalidar lista de posts para actualizar contadores en la vista de lista
+      queryClient.invalidateQueries({ 
+        queryKey: queryKeys.community.lists() 
+      });
+      
+      // Invalidar el detalle del post para actualizar contador en la página individual
       queryClient.invalidateQueries({ queryKey: queryKeys.community.detail(variables.postId) });
+      
+      // Invalidar lista de comentarios (ya está visible por actualización optimista)
+      queryClient.invalidateQueries({ queryKey: queryKeys.community.commentsList(variables.postId) });
+
       toast({
         title: 'Comentario añadido',
         description: 'Tu comentario ha sido publicado.',
       });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      // Revertir actualización optimista en caso de error
+      if (context?.previousComments !== undefined) {
+        queryClient.setQueryData(
+          queryKeys.community.commentsList(variables.postId),
+          context.previousComments
+        );
+      }
       logger.error('Error adding community comment', error as Error);
       toast({
         variant: 'destructive',
@@ -138,6 +206,7 @@ export function useLikeCommunityPost() {
       }
       return { postId, like };
     },
+    retry: false, // Deshabilitar retry para evitar likes duplicados
     onMutate: async ({ postId, like }) => {
       await queryClient.cancelQueries({ 
         queryKey: queryKeys.community.likeStatus(postId, user?.uid || '') 
@@ -236,16 +305,23 @@ export function useLikeCommunityPost() {
       });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.community.likeStatus(variables.postId, user?.uid || '') 
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.community.detail(variables.postId) 
-      });
-      // Invalidar también la lista para actualizar contadores en las tarjetas
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.community.lists() 
-      });
+      // NO invalidar inmediatamente - mantener el optimistic update
+      // La Cloud Function actualizará el contador en Firestore, y React Query
+      // detectará el cambio automáticamente si está usando listeners en tiempo real
+      // Si no, invalidamos después de un delay para dar tiempo a la Cloud Function
+      setTimeout(() => {
+        // Refetch en lugar de invalidar para evitar revertir el optimistic update
+        queryClient.refetchQueries({ 
+          queryKey: queryKeys.community.likeStatus(variables.postId, user?.uid || '') 
+        });
+        queryClient.refetchQueries({ 
+          queryKey: queryKeys.community.detail(variables.postId) 
+        });
+        // Refetch también la lista para actualizar contadores en las tarjetas
+        queryClient.refetchQueries({ 
+          queryKey: queryKeys.community.lists() 
+        });
+      }, 1000); // 1 segundo de delay para dar tiempo a la Cloud Function
     },
   });
 }

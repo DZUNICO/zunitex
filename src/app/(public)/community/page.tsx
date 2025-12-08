@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, Suspense } from 'react';
-import { useCommunityPosts } from '@/lib/react-query/queries';
+import { useCommunityPosts } from '@/lib/react-query/queries/use-community-queries';
 import { CommunityPostCard } from '@/components/community/community-post-card';
 import { CreatePostForm } from '@/components/community/create-post-form';
 import { CommunitySidebar } from '@/components/community/community-sidebar';
@@ -15,6 +15,7 @@ import { useSearchParams } from 'next/navigation';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { FeedErrorFallback } from '@/components/shared/error-fallbacks';
 import { QUERY_LIMITS, QUERY_MESSAGES } from '@/lib/react-query/constants';
+import { toDate } from '@/lib/utils/date-helpers';
 
 function CommunityContent() {
   const queryClient = useQueryClient();
@@ -59,7 +60,7 @@ function CommunityContent() {
         const getHotScore = (post: typeof a) => {
           const likes = post.likes || 0;
           const comments = post.commentsCount || 0;
-          const hoursSinceCreation = (Date.now() - new Date(post.createdAt).getTime()) / (1000 * 60 * 60);
+          const hoursSinceCreation = (Date.now() - toDate(post.createdAt).getTime()) / (1000 * 60 * 60);
           
           // Fórmula similar a Reddit: (likes + comments * 2) / (hours + 2)^1.5
           const engagement = likes + comments * 2;
@@ -75,10 +76,10 @@ function CommunityContent() {
         }
         
         // Si los scores son muy similares, ordenar por fecha
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return toDate(b.createdAt).getTime() - toDate(a.createdAt).getTime();
       } else {
         // Ordenar por fecha (más recientes primero)
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return toDate(b.createdAt).getTime() - toDate(a.createdAt).getTime();
       }
     });
   }, [posts, sortBy]);

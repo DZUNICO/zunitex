@@ -92,22 +92,30 @@ service cloud.firestore {
       // Actualización: Propio usuario o admin
       allow update: if (isOwner(userId) || isAdmin()) &&
 
-                      // CAMPOS QUE NO SE PUEDEN MODIFICAR
-                      request.resource.data.uid == resource.data.uid &&
+                      (
+                        // Permitir actualizar solo lastLogin sin restricciones
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin'])
+                        ||
+                        // O actualizar otros campos (puede incluir lastLogin) con restricciones
+                        (
+                          // CAMPOS QUE NO SE PUEDEN MODIFICAR (excepto lastLogin)
+                          request.resource.data.uid == resource.data.uid &&
 
-                      request.resource.data.email == resource.data.email &&
+                          request.resource.data.email == resource.data.email &&
 
-                      request.resource.data.createdAt == resource.data.createdAt &&
+                          request.resource.data.createdAt == resource.data.createdAt &&
 
-                      // ROLE SOLO PUEDE SER CAMBIADO POR ADMIN
-                      (isAdmin() || request.resource.data.role == resource.data.role) &&
+                          // ROLE SOLO PUEDE SER CAMBIADO POR ADMIN
+                          (isAdmin() || request.resource.data.role == resource.data.role) &&
 
-                      // CONTADORES NO SE PUEDEN MODIFICAR MANUALMENTE
-                      request.resource.data.followersCount == resource.data.followersCount &&
+                          // CONTADORES NO SE PUEDEN MODIFICAR MANUALMENTE
+                          request.resource.data.followersCount == resource.data.followersCount &&
 
-                      request.resource.data.followingCount == resource.data.followingCount &&
+                          request.resource.data.followingCount == resource.data.followingCount &&
 
-                      request.resource.data.projectsCount == resource.data.projectsCount;
+                          request.resource.data.projectsCount == resource.data.projectsCount
+                        )
+                      );
       
       // Eliminación: Solo admin
       allow delete: if isAdmin();
@@ -148,24 +156,16 @@ service cloud.firestore {
     // COMMENTS COLLECTION (Project Comments)
     // ============================================================================
     match /comments/{commentId} {
-      allow read: if true; // Comentarios públicos
+      allow read: if true;
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid &&
-                       // Verificar campos requeridos (createdAt puede ser serverTimestamp)
-                       'projectId' in request.resource.data &&
-                       'userId' in request.resource.data &&
-                       'userDisplayName' in request.resource.data &&
-                       'content' in request.resource.data &&
-                       request.resource.data.content is string &&
-                       request.resource.data.content.size() > 0 &&
-                       request.resource.data.content.size() <= 1000;
+                       request.resource.data.userId != null &&
+                       request.resource.data.projectId != null;
       allow update: if isAuthenticated() &&
-                       (resource.data.userId == request.auth.uid || isAdmin()) &&
-                       request.resource.data.content is string &&
-                       request.resource.data.content.size() > 0 &&
-                       request.resource.data.content.size() <= 1000;
+                       request.auth.uid == resource.data.userId;
       allow delete: if isAuthenticated() &&
-                       (resource.data.userId == request.auth.uid || isAdmin());
+                       (request.auth.uid == resource.data.userId ||
+                        request.auth.token.role == 'admin');
     }
     
     /**
@@ -185,8 +185,7 @@ service cloud.firestore {
     match /blog-comments/{commentId} {
       allow read: if true; // Público
       allow create: if isAuthenticated() &&
-                      request.resource.data.content.size() >= 1 &&
-                      request.resource.data.content.size() <= 1000;
+                      request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || canModerate();
       allow delete: if isOwner(resource.data.userId) || canModerate();
     }
@@ -270,7 +269,16 @@ service cloud.firestore {
     match /community-posts/{postId} {
       allow read: if true; // Público
       allow create: if isAuthenticated();
-      allow update: if isOwner(resource.data.userId) || canModerate();
+      
+      // Permitir actualizar solo commentsCount o likes a cualquier usuario autenticado
+      // O permitir actualizar otros campos si es el dueño o moderador
+      allow update: if isOwner(resource.data.userId) || 
+                       canModerate() ||
+                       (isAuthenticated() && 
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']) ||
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) ||
+                         request.resource.data.diff(resource.data).affectedKeys().hasAll(['commentsCount', 'likes'])));
+      
       allow delete: if isOwner(resource.data.userId) || canModerate();
     }
     
@@ -280,8 +288,7 @@ service cloud.firestore {
     match /post-comments/{commentId} {
       allow read: if true; // Público
       allow create: if isAuthenticated() &&
-                      request.resource.data.content.size() >= 1 &&
-                      request.resource.data.content.size() <= 1000;
+                      request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId) || canModerate();
       allow delete: if isOwner(resource.data.userId) || canModerate();
     }

@@ -22,6 +22,7 @@ interface ProfileHeaderProps {
     projectsCount: number;
     createdAt: string;
     role: string;
+    userType?: string;  // Tipo de usuario (categoría de negocio)
     photoURL?: string | null;
   };
   isOwnProfile?: boolean; // Si es true, muestra botones de edición
@@ -32,7 +33,7 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
   const [isEditing, setIsEditing] = useState(false);
   const [currentAvatar, setCurrentAvatar] = useState<string | null>(profile.photoURL ?? null);
   const [currentProfile, setCurrentProfile] = useState(profile);
- 
+
   // Actualizamos el avatar cuando cambia el perfil
   useEffect(() => {
     setCurrentAvatar(profile.photoURL ?? null);
@@ -64,6 +65,20 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
     });
   };
 
+  const getUserTypeLabel = (userType: string): string => {
+    const labels: Record<string, string> = {
+      'electrician': 'Electricista',
+      'corporate_pro': 'Profesional de Empresa',
+      'retailer': 'Minorista',
+      'distributor': 'Distribuidor',
+      'manufacturer': 'Fabricante',
+      'buyer': 'Comprador',
+      'student': 'Estudiante',
+      'general': 'Usuario General'
+    };
+    return labels[userType] || userType;
+  };
+
   return (
     <div className="space-y-6">
       <Card className="p-6">
@@ -73,15 +88,15 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
           <div className="flex flex-col items-center md:items-start">
             {/* Mostrar Avatar sin edición si no es perfil propio */}
             {isOwnProfile ? (
-              <ProfileImageUpload 
-                currentImageUrl={currentAvatar} 
+              <ProfileImageUpload
+                currentImageUrl={currentAvatar}
                 onImageUpdate={handleAvatarUpdate}
               />
             ) : (
               <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-background shadow-lg">
                 {currentAvatar ? (
-                  <img 
-                    src={currentAvatar} 
+                  <img
+                    src={currentAvatar}
                     alt={currentProfile.displayName}
                     className="w-full h-full object-cover"
                   />
@@ -94,11 +109,11 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
                 )}
               </div>
             )}
-            
+
             {/* Botón editar solo si es perfil propio */}
             {isOwnProfile && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setIsEditing(true)}
                 className="w-full max-w-[200px] mx-auto my-2"
               >
@@ -110,12 +125,19 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
           {/* Columna derecha con información del perfil */}
           <div className="flex-1 text-center md:text-left mt-6 md:mt-0">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
-              <h1 className="text-2xl font-bold">{currentProfile.displayName}{' '}{"("+currentProfile.role+")"}</h1>
+              <h1 className="text-2xl font-bold">
+                {currentProfile.displayName}
+                {currentProfile.userType && (
+                  <span className="text-lg font-normal text-muted-foreground ml-2">
+                    ({getUserTypeLabel(currentProfile.userType)})
+                  </span>
+                )}
+              </h1>
               <div className="flex items-center justify-center md:justify-start gap-2">
                 <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                <span className="font-medium">{currentProfile.rating.toFixed(1)}</span>
+                <span className="font-medium">{(currentProfile.rating ?? 0).toFixed(1)}</span>
                 <span className="text-muted-foreground">
-                  ({currentProfile.projectsCount} proyectos)
+                  ({currentProfile.projectsCount ?? 0} proyectos)
                 </span>
               </div>
             </div>
@@ -140,7 +162,7 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
             )}
 
             <div className="flex flex-wrap justify-center md:justify-start gap-2">
-              {currentProfile.specialties.map((specialty, index) => (
+              {(currentProfile.specialties ?? []).map((specialty, index) => (
                 <Badge key={index} variant="secondary">
                   {specialty}
                 </Badge>
@@ -157,8 +179,8 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
 
       {/* Dialog de edición solo si es perfil propio */}
       {isOwnProfile && (
-        <ProfileEditDialog 
-          open={isEditing} 
+        <ProfileEditDialog
+          open={isEditing}
           onOpenChange={setIsEditing}
           profile={currentProfile}
           onUpdate={handleProfileUpdate}

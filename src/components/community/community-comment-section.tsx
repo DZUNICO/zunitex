@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { useCommunityPostComments, useAddCommunityComment } from '@/lib/react-query/queries';
+import { useCommunityPostComments } from '@/lib/react-query/queries/use-community-queries';
+import { useAddCommunityComment } from '@/lib/react-query/mutations/use-community-mutations';
 import { useAuth } from '@/lib/context/auth-context';
 import { MessageSquare, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -27,7 +28,8 @@ export function CommunityCommentSection({ postId }: CommunityCommentSectionProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentContent.trim() || !user) return;
+    // Protección contra doble submit: verificar al inicio
+    if (!commentContent.trim() || !user || isSubmitting || addCommentMutation.isPending) return;
 
     setIsSubmitting(true);
     try {
@@ -67,11 +69,11 @@ export function CommunityCommentSection({ postId }: CommunityCommentSectionProps
             <div className="flex justify-end">
               <Button 
                 type="submit" 
-                disabled={!commentContent.trim() || isSubmitting}
+                disabled={!commentContent.trim() || isSubmitting || addCommentMutation.isPending}
                 size="sm"
               >
                 <Send className="h-4 w-4 mr-2" />
-                {isSubmitting ? 'Publicando...' : 'Publicar'}
+                {(isSubmitting || addCommentMutation.isPending) ? 'Publicando...' : 'Publicar'}
               </Button>
             </div>
           </form>

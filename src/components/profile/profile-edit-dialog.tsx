@@ -27,7 +27,7 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from "@/lib/firebase/config";
 import { useAuth } from "@/lib/context/auth-context";
 import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/react-query/queries';
+import { queryKeys } from '@/lib/react-query/keys';
 import {
   Select,
   SelectContent,
@@ -41,8 +41,8 @@ const profileSchema = z.object({
   location: z.string().min(2, "La ubicación debe tener al menos 2 caracteres"),
   about: z.string().optional(),
   specialties: z.string().transform(str => str.split(',').map(s => s.trim())),
-  role: z.enum(['user', 'electrician', 'provider'], {
-    required_error: "Por favor selecciona un rol"
+  userType: z.enum(['electrician', 'corporate_pro', 'retailer', 'distributor', 'manufacturer', 'buyer', 'student', 'general'], {
+    required_error: "Por favor selecciona tu tipo"
   })
 });
 
@@ -73,7 +73,7 @@ export function ProfileEditDialog({
       location: profile.location || '',
       about: profile.about || '',
       specialties: profile.specialties?.join(', ') || '',
-      role: profile.role || 'user',
+      userType: profile.userType || 'general',
     },
   });
 
@@ -89,7 +89,7 @@ export function ProfileEditDialog({
         location: data.location,
         about: data.about,
         specialties: data.specialties,
-        role: data.role,
+        userType: data.userType,
         updatedAt: serverTimestamp()
       });
 
@@ -98,9 +98,16 @@ export function ProfileEditDialog({
         queryKey: queryKeys.profile.detail(user.uid) 
       });
 
+      // Refetch para obtener los datos actualizados
+      await queryClient.refetchQueries({
+        queryKey: queryKeys.profile.detail(user.uid)
+      });
+
+      // Actualizar el estado local inmediatamente con los datos guardados
       onUpdate({
         ...profile,
         ...data,
+        userType: data.userType,  // Asegurar que userType se pase explícitamente
       });
 
       toast({
@@ -159,20 +166,25 @@ export function ProfileEditDialog({
             />
             <FormField
                 control={form.control}
-                name="role"
+                name="userType"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Soy</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger className="h-11">
-                          <SelectValue placeholder="Selecciona tu rol" />
+                          <SelectValue placeholder="Selecciona tu tipo" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="user">Usuario</SelectItem>
                         <SelectItem value="electrician">Electricista</SelectItem>
-                        <SelectItem value="provider">Proveedor</SelectItem>
+                        <SelectItem value="corporate_pro">Profesional de Empresa</SelectItem>
+                        <SelectItem value="retailer">Minorista</SelectItem>
+                        <SelectItem value="distributor">Distribuidor</SelectItem>
+                        <SelectItem value="manufacturer">Fabricante</SelectItem>
+                        <SelectItem value="buyer">Comprador</SelectItem>
+                        <SelectItem value="student">Estudiante</SelectItem>
+                        <SelectItem value="general">Usuario General</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

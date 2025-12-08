@@ -25,15 +25,13 @@ export function useCustomClaims(user: User | null) {
         // Forzar refresh del token para obtener claims actualizados
         const tokenResult = await user.getIdTokenResult(true);
         
-        const customClaims = tokenResult.claims as CustomClaims;
+        // Conversión segura de claims
+        const customClaims: CustomClaims = {
+          role: (tokenResult.claims.role as UserRole) || 'user',
+          admin: tokenResult.claims.admin === true,
+        };
         
-        // Verificar que existan los claims
-        if (customClaims && 'role' in customClaims) {
-          setClaims(customClaims);
-        } else {
-          // Si no hay claims, asignar default
-          setClaims({ role: 'user', admin: false });
-        }
+        setClaims(customClaims);
       } catch (error) {
         console.error('Error obteniendo custom claims:', error);
         setClaims({ role: 'user', admin: false });
@@ -47,4 +45,8 @@ export function useCustomClaims(user: User | null) {
 
   return { claims, loading };
 }
+
+
+
+
 

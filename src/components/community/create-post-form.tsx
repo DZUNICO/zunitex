@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCreateCommunityPost } from '@/lib/react-query/queries';
+import { useCreateCommunityPost } from '@/lib/react-query/mutations/use-community-mutations';
 import { useAuth } from '@/lib/context/auth-context';
 import type { PostCategory } from '@/types/community';
 import { Image as ImageIcon, X, Send, Hash } from 'lucide-react';

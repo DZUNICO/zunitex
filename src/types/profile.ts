@@ -1,5 +1,5 @@
 // Tipo base para usuario
-import { UserRole } from './roles';
+import { UserRole, UserType } from './roles';
 
 export interface BaseProfile {
     displayName: string;
@@ -18,6 +18,7 @@ export interface BaseProfile {
     id?: string;
     phone: string;
     role: UserRole;  // Actualizado para usar el tipo completo de roles
+    userType?: UserType;  // Tipo de usuario (categoría de negocio)
     photoURL?: string;  // Campo original de avatar
     certifications?: string[];
   }
@@ -26,7 +27,8 @@ export interface BaseProfile {
   export interface ProfileHeader extends BaseProfile {
     id: string;  // Requerido específicamente para el header
     photoURL: string | null;
-    role: 'admin' | 'user';
+    role: UserRole;  // Usar el tipo completo de roles
+    userType?: UserType;  // Tipo de usuario para mostrar
   }
   
   // Props para el componente ProfileHeader
@@ -47,6 +49,7 @@ export interface BaseProfile {
       projectsCount: user.projectsCount,
       createdAt: user.createdAt,
       role: user.role,
+      userType: user.userType,  // Incluir userType
       photoURL: user.photoURL || null
     };
   }

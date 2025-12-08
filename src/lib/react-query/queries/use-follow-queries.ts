@@ -8,7 +8,7 @@ import { QUERY_LIMITS } from "../constants";
 import { followersService } from "@/lib/firebase/followers";
 import { reviewsService } from "@/lib/firebase/reviews";
 import { logger } from "@/lib/utils/logger";
-import type { ReviewFilters } from "../types";
+import type { ReviewFilters } from "@/types/reviews";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 /**

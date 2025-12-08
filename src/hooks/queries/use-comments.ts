@@ -56,7 +56,6 @@ export function useAddComment() {
         userDisplayName: profile?.displayName || 'Usuario',
         photoURL: profile?.photoURL || null,
         content,
-        createdAt: new Date(),
       });
     },
     onSuccess: (_, variables) => {

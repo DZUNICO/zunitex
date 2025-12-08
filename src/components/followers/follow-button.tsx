@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { useFollowUser, useIsFollowing } from '@/lib/react-query/queries';
+import { useIsFollowing } from '@/lib/react-query/queries/use-follow-queries';
+import { useFollowUser } from '@/lib/react-query/mutations/use-follow-mutations';
 import { useAuth } from '@/lib/context/auth-context';
 import { UserPlus, UserMinus, Loader2 } from 'lucide-react';
 import { useMemo } from 'react';

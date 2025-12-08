@@ -1,7 +1,8 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useCommunityPost, useCommunityPostComments, useAddCommunityComment, useIsCommunityPostLiked, useLikeCommunityPost } from '@/lib/react-query/queries';
+import { useCommunityPost, useCommunityPostComments, useIsCommunityPostLiked } from '@/lib/react-query/queries/use-community-queries';
+import { useAddCommunityComment, useLikeCommunityPost } from '@/lib/react-query/mutations/use-community-mutations';
 import { useAuth } from '@/lib/context/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { CommunityCommentSection } from '@/components/community/community-comment-section';
+import { toDate } from '@/lib/utils/date-helpers';
 
 const categoryLabels: Record<string, string> = {
   question: 'Pregunta',
@@ -127,7 +129,7 @@ export default function CommunityPostPage() {
             </Badge>
           )}
           <span className="text-sm text-muted-foreground">
-            {formatDistanceToNow(new Date(post.createdAt), {
+            {formatDistanceToNow(toDate(post.createdAt), {
               addSuffix: true,
               locale: es,
             })}

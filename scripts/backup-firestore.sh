@@ -63,3 +63,7 @@ done
 
 echo "✅ Limpieza completada"
 
+
+
+
+

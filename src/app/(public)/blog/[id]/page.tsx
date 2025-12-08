@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { ArrowLeft, MessageSquare } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/lib/context/auth-context';
-import { useBlogPost } from '@/lib/react-query/queries';
+import { useBlogPost } from '@/lib/react-query/queries/use-blog-queries';
 import { BlogCommentSection } from '@/components/blog/blog-comment-section';
 import { BlogLikeButton } from '@/components/blog/blog-like-button';
 import { useState, useEffect } from 'react';
@@ -38,7 +38,7 @@ export default function BlogPostPage() {
 
   // Inicializar editedPost cuando el post se carga
   useEffect(() => {
-    if (post && !editedPost.title) {
+    if (post && !editedPost?.title) {
       setEditedPost({
         title: post.title,
         content: post.content,
@@ -77,6 +77,12 @@ export default function BlogPostPage() {
 
   const isAdmin = user?.email === 'diego.zuni@gmail.com';
 
+  const handleSave = () => {
+    // TODO: Implementar actualización de blog post
+    console.log('Guardar cambios:', editedPost);
+    setIsEditing(false);
+  };
+
   return (
     <article className="container max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
@@ -111,7 +117,7 @@ export default function BlogPostPage() {
         <div className="aspect-video relative overflow-hidden rounded-lg mb-8">
           <img
             src={post.imageUrl}
-            alt={editedPost.title || post.title}
+            alt={editedPost?.title || post.title}
             className="object-scale-down w-full h-full"
           />
         </div>
@@ -121,7 +127,7 @@ export default function BlogPostPage() {
         <div className="flex items-center gap-4">
           {isEditing ? (
             <Input
-              value={editedPost.category || ''}
+              value={editedPost?.category || ''}
               onChange={(e) => setEditedPost({ ...editedPost, category: e.target.value })}
               className="w-32"
             />
@@ -137,7 +143,7 @@ export default function BlogPostPage() {
             <div className="flex items-center gap-4">
               {isEditing ? (
                 <select
-                  value={editedPost.status || post.status}
+                  value={editedPost?.status || post.status}
                   onChange={(e) => setEditedPost({ 
                     ...editedPost, 
                     status: e.target.value as 'draft' | 'published' 
@@ -158,7 +164,7 @@ export default function BlogPostPage() {
 
         {isEditing ? (
           <Input
-            value={editedPost.title || ''}
+            value={editedPost?.title || ''}
             onChange={(e) => setEditedPost({ ...editedPost, title: e.target.value })}
             className="text-4xl font-bold"
           />
@@ -195,7 +201,7 @@ export default function BlogPostPage() {
           {isEditing ? (
             <div data-color-mode="light">
               <MDEditor
-                value={editedPost.content || ''}
+                value={editedPost?.content || ''}
                 onChange={(value) => setEditedPost({ ...editedPost, content: value || '' })}
                 preview="edit"
                 height={500}

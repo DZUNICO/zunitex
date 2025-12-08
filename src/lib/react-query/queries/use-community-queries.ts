@@ -8,7 +8,7 @@ import { queryKeys } from "../keys";
 import { QUERY_LIMITS } from "../constants";
 import { communityService } from "@/lib/firebase/community";
 import { logger } from "@/lib/utils/logger";
-import type { CommunityFilters } from "../types";
+import type { CommunityFilters } from "@/types/community";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 /**
@@ -73,7 +73,8 @@ export function useCommunityPostComments(postId: string | undefined) {
       return await communityService.getPostComments(postId);
     },
     enabled: !!postId,
-    staleTime: 2 * 60 * 1000, // 2 minutos
+    staleTime: 30 * 1000, // 30 segundos (reducido para mejor sincronización)
+    retry: false, // No reintentar si falla (evitar errores repetidos)
   });
 }
 

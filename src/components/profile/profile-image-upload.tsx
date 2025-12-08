@@ -10,7 +10,7 @@ import { db } from '@/lib/firebase/config';
 import { Loader2, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/react-query/queries';
+import { queryKeys } from '@/lib/react-query/keys';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { UploadErrorFallback } from '@/components/shared/error-fallbacks';
 

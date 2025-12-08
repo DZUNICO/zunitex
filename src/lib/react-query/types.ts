@@ -15,23 +15,10 @@ export interface BlogFilters {
   status?: 'published' | 'draft';
 }
 
-export interface ResourceFilters {
-  userId?: string;
-  type?: Resource['type'];
-  category?: string;
-}
+// ResourceFilters y ReviewFilters están definidos en src/types/
+export type { ResourceFilters } from '@/types/resources';
+export type { ReviewFilters } from '@/types/reviews';
 
-export interface ReviewFilters {
-  userId?: string;
-  projectId?: string;
-  reviewedUserId?: string;
-  reviewerId?: string;
-  category?: string;
-  minRating?: number;
-}
-
-export interface CommunityFilters {
-  category?: string;
-  userId?: string;
-}
+// CommunityFilters está definido en src/types/community.ts
+export type { CommunityFilters } from '@/types/community';
 

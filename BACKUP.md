@@ -272,3 +272,7 @@ cd functions && npm run build && firebase deploy --only functions:scheduledFires
 firebase functions:log --only scheduledFirestoreBackup
 ```
 
+
+
+
+

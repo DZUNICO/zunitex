@@ -44,3 +44,7 @@ firebase projects:list | grep "${PROJECT_ID}" || echo "⚠️  No se pudo verifi
 
 echo "✅ Setup completado"
 
+
+
+
+

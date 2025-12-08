@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { ProfileTabsProps } from '@/types/profile';
-import { useUserProjects, useUserProjectsById } from '@/lib/react-query/queries';
+import { useUserProjects, useUserProjectsById } from '@/lib/react-query/queries/use-project-queries';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import type { Project } from '@/types/project';

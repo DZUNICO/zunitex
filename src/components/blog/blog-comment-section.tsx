@@ -5,13 +5,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { useBlogComments, useAddBlogComment } from '@/lib/react-query/queries';
+import { useBlogComments } from '@/lib/react-query/queries/use-blog-queries';
+import { useAddBlogComment } from '@/lib/react-query/mutations/use-blog-mutations';
 import { useAuth } from '@/lib/context/auth-context';
 import { MessageSquare, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { BlogComment } from '@/lib/firebase/blog-comments';
 import Link from 'next/link';
+import { toDate } from '@/lib/utils/date-helpers';
 
 interface BlogCommentSectionProps {
   postId: string;
@@ -26,7 +28,8 @@ export function BlogCommentSection({ postId }: BlogCommentSectionProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentContent.trim() || !user) return;
+    // Protección contra doble submit: verificar al inicio
+    if (!commentContent.trim() || !user || isSubmitting || addCommentMutation.isPending) return;
 
     setIsSubmitting(true);
     try {
@@ -66,11 +69,11 @@ export function BlogCommentSection({ postId }: BlogCommentSectionProps) {
             <div className="flex justify-end">
               <Button 
                 type="submit" 
-                disabled={!commentContent.trim() || isSubmitting}
+                disabled={!commentContent.trim() || isSubmitting || addCommentMutation.isPending}
                 size="sm"
               >
                 <Send className="h-4 w-4 mr-2" />
-                {isSubmitting ? 'Publicando...' : 'Publicar'}
+                {(isSubmitting || addCommentMutation.isPending) ? 'Publicando...' : 'Publicar'}
               </Button>
             </div>
           </form>
@@ -129,7 +132,7 @@ function CommentItem({ comment }: { comment: BlogComment }) {
               {comment.userName}
             </Link>
             <span className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(comment.createdAt), {
+              {formatDistanceToNow(toDate(comment.createdAt), {
                 addSuffix: true,
                 locale: es,
               })}

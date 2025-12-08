@@ -51,13 +51,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user);
       
       if (user) {
-        // Actualizar lastLogin en Firestore
+        // Actualizar lastLogin en Firestore (error no-crítico)
         try {
           await updateDoc(doc(db, 'users', user.uid), {
             lastLogin: serverTimestamp()
           });
         } catch (error) {
-          console.error('Error actualizando lastLogin:', error);
+          // Error no-crítico, solo logear warning
+          console.warn('No se pudo actualizar lastLogin:', error);
         }
       }
       

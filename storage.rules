@@ -69,6 +69,26 @@ service firebase.storage {
     }
 
     // ========== COMMUNITY POSTS ==========
+    // Ruta para imágenes antes de crear el post (community-posts/{userId}/...)
+    match /community-posts/{userId}/{fileName} {
+      allow read: if isAuth();
+      
+      // CREATE: Usuario autenticado puede subir a su propia carpeta
+      allow write: if resource == null
+                    && (isOwner(userId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(10 * 1024 * 1024);
+      
+      // UPDATE/DELETE: Solo el propietario o admin
+      allow write: if resource != null
+                    && (isOwner(userId) || isAdmin())
+                    && isImage()
+                    && hasImageExtension(fileName)
+                    && maxSize(10 * 1024 * 1024);
+    }
+
+    // Ruta para posts existentes (posts/{postId}/...)
     match /posts/{postId}/{fileName} {
       allow read: if isAuth();
       

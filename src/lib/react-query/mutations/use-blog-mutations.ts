@@ -39,6 +39,7 @@ export function useAddBlogComment() {
         parentId,
       });
     },
+    retry: false, // Deshabilitar retry para evitar comentarios duplicados
     onMutate: async ({ postId, content, parentId }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.blog.commentsList(postId) });
 

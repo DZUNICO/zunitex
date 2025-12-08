@@ -7,7 +7,7 @@ import { queryKeys } from "../keys";
 import { QUERY_LIMITS } from "../constants";
 import { resourcesService } from "@/lib/firebase/resources";
 import { logger } from "@/lib/utils/logger";
-import type { ResourceFilters } from "../types";
+import type { ResourceFilters } from "@/types/resources";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 /**

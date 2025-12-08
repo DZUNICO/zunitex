@@ -15,7 +15,8 @@ import { Heart, MessageSquare, Eye, Pin, MoreVertical, Pencil, Trash2 } from 'lu
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useIsCommunityPostLiked, useLikeCommunityPost, useDeleteCommunityPost } from '@/lib/react-query/queries';
+import { useIsCommunityPostLiked } from '@/lib/react-query/queries/use-community-queries';
+import { useLikeCommunityPost, useDeleteCommunityPost } from '@/lib/react-query/mutations/use-community-mutations';
 import { useAuth } from '@/lib/context/auth-context';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/types/community';

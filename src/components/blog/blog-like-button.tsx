@@ -2,7 +2,8 @@
 
 import { Button } from '@/components/ui/button';
 import { Heart } from 'lucide-react';
-import { useIsBlogPostLiked, useLikeBlogPost } from '@/lib/react-query/queries';
+import { useIsBlogPostLiked } from '@/lib/react-query/queries/use-blog-queries';
+import { useLikeBlogPost } from '@/lib/react-query/mutations/use-blog-mutations';
 import { useAuth } from '@/lib/context/auth-context';
 import { cn } from '@/lib/utils';
 

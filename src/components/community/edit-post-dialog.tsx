@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useUpdateCommunityPost } from '@/lib/react-query/queries';
+import { useUpdateCommunityPost } from '@/lib/react-query/mutations/use-community-mutations';
 import { useAuth } from '@/lib/context/auth-context';
 import type { CommunityPost, PostCategory } from '@/types/community';
 import { Image as ImageIcon, X, Hash } from 'lucide-react';

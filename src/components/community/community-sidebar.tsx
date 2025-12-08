@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Hash, Users, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
-import { useCommunityPosts } from '@/lib/react-query/queries';
+import { useCommunityPosts } from '@/lib/react-query/queries/use-community-queries';
 import { useMemo } from 'react';
 
 const categories = [

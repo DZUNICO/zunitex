@@ -223,15 +223,13 @@ export const communityService = {
         throw new Error('Ya has dado like a este post');
       }
 
-      // SOLO crear documento en post-likes
-      // Cloud Function se encargará de incrementar contador automáticamente
+      // Crear documento en post-likes
+      // Cloud Function onPostLikeCreate incrementará el contador automáticamente
       await addDoc(collection(db, 'post-likes'), {
         userId,
         postId,
         createdAt: serverTimestamp(),
       });
-
-      // NO incrementar likes aquí - Cloud Function lo hace
     } catch (error) {
       logger.error('Error liking post', error as Error, { userId, postId });
       throw error;
@@ -251,13 +249,11 @@ export const communityService = {
         throw new Error('No has dado like a este post');
       }
 
-      // SOLO eliminar documento en post-likes
-      // Cloud Function se encargará de decrementar contador automáticamente
+      // Eliminar documento en post-likes
+      // Cloud Function onPostLikeDelete decrementará el contador automáticamente
       await Promise.all(
         existingLike.docs.map((doc) => deleteDoc(doc.ref))
       );
-
-      // NO decrementar likes aquí - Cloud Function lo hace
     } catch (error) {
       logger.error('Error unliking post', error as Error, { userId, postId });
       throw error;
@@ -328,10 +324,21 @@ export const communityService = {
 
   async addPostComment(data: Omit<PostComment, 'id' | 'createdAt' | 'likes'>): Promise<string> {
     try {
+      // Validar que userId esté presente (requerido por Firestore rules)
+      if (!data.userId) {
+        throw new Error('userId is required to create a comment');
+      }
+
       // Filtrar campos undefined ya que Firebase no los acepta
+      // PERO asegurar que userId siempre esté presente
       const cleanData = Object.fromEntries(
         Object.entries(data).filter(([_, value]) => value !== undefined)
       );
+      
+      // Asegurar que userId esté presente (no debe filtrarse)
+      if (!cleanData.userId) {
+        cleanData.userId = data.userId;
+      }
       
       const commentRef = await addDoc(collection(db, 'post-comments'), {
         ...cleanData,
@@ -339,10 +346,36 @@ export const communityService = {
         createdAt: serverTimestamp(),
       });
 
-      // Incrementar contador de comentarios del post
-      await updateDoc(doc(db, 'community-posts', data.postId), {
-        commentsCount: increment(1),
-      });
+      // Intentar incrementar contador de comentarios del post
+      // Si falla por permisos, no revertimos la creación del comentario
+      try {
+        await updateDoc(doc(db, 'community-posts', data.postId), {
+          commentsCount: increment(1),
+        });
+      } catch (counterError) {
+        // Loggear el error para debugging
+        const errorCode = (counterError as any)?.code || 'unknown';
+        const errorMessage = counterError instanceof Error ? counterError.message : String(counterError);
+        
+        const error = new Error(`Failed to increment commentsCount: ${errorMessage}`);
+        (error as any).component = 'communityService';
+        (error as any).action = 'addPostComment';
+        (error as any).postId = data.postId;
+        logger.error('Failed to increment commentsCount', error, {
+          errorCode,
+        });
+        
+        // En desarrollo, también mostrar en consola para debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to increment comment count:', {
+            postId: data.postId,
+            error: counterError,
+            errorCode,
+          });
+        }
+        
+        // No lanzar el error - el comentario ya se creó exitosamente
+      }
 
       return commentRef.id;
     } catch (error) {
