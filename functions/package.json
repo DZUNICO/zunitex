@@ -15,7 +15,8 @@
     "logs": "firebase functions:log",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "test:ci": "jest --ci --coverage --maxWorkers=2"
+    "test:ci": "jest --ci --coverage --maxWorkers=2",
+    "migrate:users": "ts-node --esm src/scripts/migrateUsers.ts"
   },
   "main": "lib/index.js",
   "dependencies": {

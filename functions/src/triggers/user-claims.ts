@@ -22,19 +22,29 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
 
     console.log(`Nuevo usuario creado: ${email}`, {uid, role: initialRole});
 
-    // Crear documento en Firestore
+    // Crear documento en Firestore con todos los campos necesarios
     const userDoc = {
       uid,
       email,
       displayName: displayName || "",
+      photoURL: user.photoURL || null,
       role: initialRole,
       userType: "general" as const,
+      location: "",
+      phone: "",
+      about: "",
+      specialties: [],
+      active: true,
       verificationStatus: null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      // Contadores inicializados en 0
       followersCount: 0,
       followingCount: 0,
       projectsCount: 0,
+      rating: 0,
+      reviewsCount: 0,
+      resourcesCount: 0,
     };
 
     await admin
