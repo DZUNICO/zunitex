@@ -175,7 +175,12 @@ service cloud.firestore {
       allow read: if true; // Público
       // ACTUALIZADO: Solo admin y moderator pueden crear
       allow create: if canModerate();
-      allow update: if isOwner(resource.data.authorId) || canModerate();
+      // Permitir actualizar solo commentsCount a cualquier usuario autenticado
+      // O permitir actualizar otros campos si es el autor o moderador
+      allow update: if isOwner(resource.data.authorId) || 
+                       canModerate() ||
+                       (isAuthenticated() && 
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']));
       allow delete: if isOwner(resource.data.authorId) || canModerate();
     }
     

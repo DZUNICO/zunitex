@@ -12,12 +12,15 @@ export function toDate(value: Timestamp | Date | undefined): Date {
     return value;
   }
   
-  // Si es Timestamp de Firestore, convertir
+  // Si es Timestamp de Firestore, usar método toDate()
+  // Timestamp siempre tiene el método toDate()
   if (value && typeof value.toDate === 'function') {
     return value.toDate();
   }
   
-  // Fallback: intentar crear Date desde el valor
-  return new Date(value);
+  // Este caso no debería ocurrir, pero TypeScript lo requiere
+  // Si llegamos aquí, value es Timestamp pero sin toDate (imposible)
+  // Retornamos fecha actual como fallback seguro
+  return new Date();
 }
 

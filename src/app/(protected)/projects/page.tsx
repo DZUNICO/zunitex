@@ -98,9 +98,9 @@ export default function ProjectsPage() {
           </DialogHeader>
           <ProjectForm
             initialData={selectedProject || undefined}
-            onSubmit={(data) => {
+            onSubmit={async (data) => {
               if (selectedProject?.id) {
-                handleUpdate(selectedProject.id, data);
+                await handleUpdate(selectedProject.id, data);
               }
             }}
           />

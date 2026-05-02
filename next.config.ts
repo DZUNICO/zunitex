@@ -5,9 +5,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   
   // ✅ AGREGAR: Ignorar errores de build temporalmente
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // eslint ya no existe en NextConfig de Next.js 15/16
+  // Se maneja automáticamente o mediante .eslintrc
   typescript: {
     ignoreBuildErrors: true,
   },

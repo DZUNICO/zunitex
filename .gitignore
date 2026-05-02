@@ -55,3 +55,6 @@ firebase-debug.log
 
 .vercel
 serviceAccountKey.json 
+
+# Claude Code local settings
+.claude/settings.local.json

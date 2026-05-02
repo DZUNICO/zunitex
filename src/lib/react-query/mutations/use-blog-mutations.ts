@@ -34,7 +34,7 @@ export function useAddBlogComment() {
         postId,
         userId: user.uid,
         userName: profile?.displayName || user.displayName || 'Usuario',
-        userAvatar: profile?.photoURL || user.photoURL || null,
+        userAvatar: profile?.photoURL || user.photoURL || undefined,
         content,
         parentId,
       });
@@ -146,12 +146,23 @@ export function useLikeBlogPost() {
       });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.blog.likeStatus(variables.postId, user?.uid || '') 
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.blog.detail(variables.postId) 
-      });
+      // NO invalidar inmediatamente - mantener el optimistic update
+      // La Cloud Function actualizará el contador en Firestore, y React Query
+      // detectará el cambio automáticamente si está usando listeners en tiempo real
+      // Si no, refetch después de un delay para dar tiempo a la Cloud Function
+      setTimeout(() => {
+        // Refetch en lugar de invalidar para evitar revertir el optimistic update
+        queryClient.refetchQueries({ 
+          queryKey: queryKeys.blog.likeStatus(variables.postId, user?.uid || '') 
+        });
+        queryClient.refetchQueries({ 
+          queryKey: queryKeys.blog.detail(variables.postId) 
+        });
+        // Refetch también la lista para actualizar contadores en las tarjetas
+        queryClient.refetchQueries({ 
+          queryKey: queryKeys.blog.lists() 
+        });
+      }, 800); // 1 segundo de delay para dar tiempo a la Cloud Function
     },
   });
 }

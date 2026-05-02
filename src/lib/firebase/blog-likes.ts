@@ -3,12 +3,9 @@ import {
   collection, 
   addDoc, 
   deleteDoc, 
-  doc, 
   query, 
   where, 
   getDocs,
-  updateDoc,
-  increment,
   serverTimestamp
 } from 'firebase/firestore';
 import { logger } from '@/lib/utils/logger';
@@ -35,17 +32,13 @@ export const blogLikesService = {
         throw new Error('Ya has dado like a este post');
       }
 
-      // Crear like y actualizar contador
-      await Promise.all([
-        addDoc(collection(db, 'blog-likes'), {
-          userId,
-          postId,
-          createdAt: serverTimestamp(),
-        }),
-        updateDoc(doc(db, 'blog-posts', postId), {
-          likesCount: increment(1),
-        }),
-      ]);
+      // Crear documento en blog-likes
+      // Cloud Function onBlogLikeCreate incrementará el contador automáticamente
+      await addDoc(collection(db, 'blog-likes'), {
+        userId,
+        postId,
+        createdAt: serverTimestamp(),
+      });
     } catch (error) {
       logger.error('Error liking blog post', error as Error, { userId, postId });
       throw error;
@@ -65,13 +58,11 @@ export const blogLikesService = {
         throw new Error('No has dado like a este post');
       }
 
-      // Eliminar like y actualizar contador
-      await Promise.all([
-        ...existingLike.docs.map(doc => deleteDoc(doc.ref)),
-        updateDoc(doc(db, 'blog-posts', postId), {
-          likesCount: increment(-1),
-        }),
-      ]);
+      // Eliminar documento en blog-likes
+      // Cloud Function onBlogLikeDelete decrementará el contador automáticamente
+      await Promise.all(
+        existingLike.docs.map(doc => deleteDoc(doc.ref))
+      );
     } catch (error) {
       logger.error('Error unliking blog post', error as Error, { userId, postId });
       throw error;

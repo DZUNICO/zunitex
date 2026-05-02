@@ -97,10 +97,19 @@ export const blogCommentsService = {
         createdAt: serverTimestamp(),
       });
 
-      // Incrementar contador de comentarios del post
-      await updateDoc(doc(db, 'blog-posts', data.postId), {
-        commentsCount: increment(1),
-      });
+      // Intentar incrementar contador de comentarios del post
+      // Si falla por permisos, no revertimos la creación del comentario
+      try {
+        await updateDoc(doc(db, 'blog-posts', data.postId), {
+          commentsCount: increment(1),
+        });
+      } catch (counterError) {
+        // Log del error pero no revertir la creación del comentario
+        logger.error('Error incrementing blog post commentsCount', counterError as Error, { 
+          postId: data.postId,
+          commentId: commentRef.id 
+        });
+      }
 
       return commentRef.id;
     } catch (error) {
@@ -136,11 +145,20 @@ export const blogCommentsService = {
         ...replies.docs.map(doc => deleteDoc(doc.ref)),
       ]);
 
-      // Decrementar contador de comentarios del post
+      // Intentar decrementar contador de comentarios del post
+      // Si falla por permisos, no revertimos la eliminación del comentario
       const totalToDecrement = 1 + replies.docs.length;
-      await updateDoc(doc(db, 'blog-posts', postId), {
-        commentsCount: increment(-totalToDecrement),
-      });
+      try {
+        await updateDoc(doc(db, 'blog-posts', postId), {
+          commentsCount: increment(-totalToDecrement),
+        });
+      } catch (counterError) {
+        // Log del error pero no revertir la eliminación del comentario
+        logger.error('Error decrementing blog post commentsCount', counterError as Error, { 
+          postId,
+          commentId 
+        });
+      }
     } catch (error) {
       logger.error('Error deleting blog comment', error as Error, { commentId });
       throw error;

@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -130,9 +131,12 @@ export function ProfileEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" aria-describedby="edit-profile-description">
         <DialogHeader>
           <DialogTitle>Editar Perfil</DialogTitle>
+          <DialogDescription id="edit-profile-description">
+            Actualiza tu información personal y configuración de perfil
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

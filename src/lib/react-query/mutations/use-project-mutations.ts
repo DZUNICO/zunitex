@@ -30,7 +30,7 @@ export function useCreateProject() {
       const newProjectData: Omit<Project, 'id'> = {
         ...data,
         createdBy: user.uid,
-        // createdAt se maneja con serverTimestamp() en projectsService
+        createdAt: new Date(), // Se sobrescribirá con serverTimestamp() en projectsService
         status: data.status || 'Pendiente',
         images: data.images || [],
         tags: data.tags || [],
