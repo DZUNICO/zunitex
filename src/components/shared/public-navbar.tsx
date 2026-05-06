@@ -28,9 +28,14 @@ const menuItems = [
     description: 'Conecta con otros electricistas'
   },
   {
+    label: 'Catálogo',
+    href: '/catalogo',
+    description: 'Buscador técnico de productos'
+  },
+  {
     label: 'Proveedores',
-    href: '/providers',
-    description: 'Encuentra proveedores confiables'
+    href: '/proveedores',
+    description: 'Distribuidores y ferreterías verificadas'
   }
 ];
 

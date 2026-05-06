@@ -85,30 +85,38 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       
       // Creación: Solo cuando el usuario se registra (auth.uid == userId)
-      allow create: if isOwner(userId) && 
+      // TEMPORAL: acepta valores legacy mientras corre la migración migrateUserTypes
+      allow create: if isOwner(userId) &&
                       request.resource.data.role == 'user' && // Role inicial siempre 'user'
-                      request.resource.data.userType in ['general', 'electrician', 'corporate_pro', 'retailer', 'distributor', 'manufacturer', 'buyer', 'student'];
+                      request.resource.data.userType in [
+                        'profesional', 'proveedor',
+                        'electrician', 'corporate_pro', 'retailer',
+                        'distributor', 'manufacturer', 'buyer', 'student', 'general'
+                      ];
       
       // Actualización: Propio usuario o admin
       allow update: if (isOwner(userId) || isAdmin()) &&
 
                       (
-                        // Permitir actualizar solo lastLogin sin restricciones
+                        // Solo lastLogin: sin restricciones adicionales
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin'])
                         ||
-                        // O actualizar otros campos (puede incluir lastLogin) con restricciones
+                        // Admin: puede actualizar cualquier campo de cualquier usuario
+                        // (no necesita pasar los chequeos de campo de usuario regular)
+                        isAdmin()
+                        ||
+                        // Usuario regular: campos protegidos no pueden modificarse
                         (
-                          // CAMPOS QUE NO SE PUEDEN MODIFICAR (excepto lastLogin)
                           request.resource.data.uid == resource.data.uid &&
 
                           request.resource.data.email == resource.data.email &&
 
                           request.resource.data.createdAt == resource.data.createdAt &&
 
-                          // ROLE SOLO PUEDE SER CAMBIADO POR ADMIN
-                          (isAdmin() || request.resource.data.role == resource.data.role) &&
+                          // Role solo puede ser cambiado por admin (ya cubierto arriba)
+                          request.resource.data.role == resource.data.role &&
 
-                          // CONTADORES NO SE PUEDEN MODIFICAR MANUALMENTE
+                          // Contadores no se pueden modificar manualmente
                           request.resource.data.followersCount == resource.data.followersCount &&
 
                           request.resource.data.followingCount == resource.data.followingCount &&

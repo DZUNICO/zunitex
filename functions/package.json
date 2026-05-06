@@ -16,7 +16,8 @@
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
-    "migrate:users": "ts-node --esm src/scripts/migrateUsers.ts"
+    "migrate:users": "ts-node --esm src/scripts/migrateUsers.ts",
+    "migrate:user-types": "ts-node --esm src/scripts/migrateUserTypes.ts"
   },
   "main": "lib/index.js",
   "dependencies": {

@@ -29,7 +29,7 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
       displayName: displayName || "",
       photoURL: user.photoURL || null,
       role: initialRole,
-      userType: "general" as const,
+      userType: "profesional" as const,
       location: "",
       phone: "",
       about: "",

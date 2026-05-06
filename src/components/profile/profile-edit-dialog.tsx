@@ -42,7 +42,7 @@ const profileSchema = z.object({
   location: z.string().min(2, "La ubicación debe tener al menos 2 caracteres"),
   about: z.string().optional(),
   specialties: z.string().transform(str => str.split(',').map(s => s.trim())),
-  userType: z.enum(['electrician', 'corporate_pro', 'retailer', 'distributor', 'manufacturer', 'buyer', 'student', 'general'], {
+  userType: z.enum(['profesional', 'proveedor'], {
     required_error: "Por favor selecciona tu tipo"
   })
 });
@@ -74,7 +74,7 @@ export function ProfileEditDialog({
       location: profile.location || '',
       about: profile.about || '',
       specialties: profile.specialties?.join(', ') || '',
-      userType: profile.userType || 'general',
+      userType: (profile.userType === 'proveedor' ? 'proveedor' : 'profesional'),
     },
   });
 
@@ -181,14 +181,8 @@ export function ProfileEditDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="electrician">Electricista</SelectItem>
-                        <SelectItem value="corporate_pro">Profesional de Empresa</SelectItem>
-                        <SelectItem value="retailer">Minorista</SelectItem>
-                        <SelectItem value="distributor">Distribuidor</SelectItem>
-                        <SelectItem value="manufacturer">Fabricante</SelectItem>
-                        <SelectItem value="buyer">Comprador</SelectItem>
-                        <SelectItem value="student">Estudiante</SelectItem>
-                        <SelectItem value="general">Usuario General</SelectItem>
+                        <SelectItem value="profesional">Profesional</SelectItem>
+                        <SelectItem value="proveedor">Proveedor</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

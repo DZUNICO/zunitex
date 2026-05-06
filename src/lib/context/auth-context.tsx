@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName,
         phone,
         role: DEFAULT_ROLE, // 'user'
-        userType: DEFAULT_USER_TYPE, // 'general'
+        userType: DEFAULT_USER_TYPE, // 'profesional'
         verificationStatus: null,
         createdAt: serverTimestamp(),
         lastLogin: serverTimestamp(),

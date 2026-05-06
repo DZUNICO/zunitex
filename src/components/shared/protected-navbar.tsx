@@ -20,50 +20,44 @@ import {
 } from "@/components/ui/sheet";
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { 
-  Zap, 
-  User, 
-  Settings, 
-  LogOut, 
+import {
+  Zap,
+  User,
+  Settings,
+  LogOut,
   Menu,
-  LayoutDashboard,
   FileText,
   Users,
-  BookOpen
+  BookOpen,
+  Store
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 
 const menuItems = [
   {
-    icon: FileText, 
+    icon: FileText,
     label: 'Blog',
     href: '/blog',
     description: 'Artículos y tutoriales'
   },
-  { 
-    icon: LayoutDashboard, 
-    label: 'Dashboard', 
-    href: '/dashboard',
-    description: 'Vista general de tu actividad'
-  },
-  { 
-    icon: FileText, 
-    label: 'Proyectos', 
-    href: '/projects',
-    description: 'Gestiona tus proyectos'
-  },
-  { 
-    icon: Users, 
-    label: 'Comunidad', 
+  {
+    icon: Users,
+    label: 'Comunidad',
     href: '/community',
     description: 'Conecta con otros electricistas'
   },
-  { 
-    icon: BookOpen, 
-    label: 'Recursos', 
-    href: '/resources',
-    description: 'Accede a materiales y guías'
+  {
+    icon: BookOpen,
+    label: 'Catálogo',
+    href: '/catalogo',
+    description: 'Buscador técnico de productos'
+  },
+  {
+    icon: Store,
+    label: 'Proveedores',
+    href: '/proveedores',
+    description: 'Distribuidores y ferreterías'
   },
 ];
 

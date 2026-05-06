@@ -13,18 +13,12 @@ export type UserRole =
   | 'user';           // Usuario básico (default)
 
 /**
- * TIPOS DE USUARIO - Categoría de negocio
- * Define QUIÉN es el usuario
+ * TIPOS DE USUARIO - Categoría de perfil visible
+ * Define QUIÉN es el usuario (display, no afecta permisos)
  */
-export type UserType = 
-  | 'electrician'     // Electricista independiente
-  | 'corporate_pro'   // Profesional de empresa grande (ej: Ing. de SIEMENS)
-  | 'retailer'        // Minorista (venta menor)
-  | 'distributor'     // Mayorista/Distribuidor
-  | 'manufacturer'    // Fabricante/Dueño de marca
-  | 'buyer'           // Comprador (empresas, constructoras)
-  | 'student'         // Estudiante
-  | 'general';        // Usuario general (default)
+export type UserType =
+  | 'profesional'  // Técnicos, ingenieros, contratistas, estudiantes, compradores
+  | 'proveedor';   // Ferreterías, distribuidores, importadores, fabricantes
 
 /**
  * Custom Claims en el token JWT
@@ -105,7 +99,7 @@ export const RolePermissions = {
  * Constantes
  */
 export const DEFAULT_ROLE: UserRole = 'user';
-export const DEFAULT_USER_TYPE: UserType = 'general';
+export const DEFAULT_USER_TYPE: UserType = 'profesional';
 export const ADMIN_EMAIL = 'diego.zuni@gmail.com';
 
 

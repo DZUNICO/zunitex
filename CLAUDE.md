@@ -57,6 +57,8 @@ Role hierarchy (in `src/types/roles.ts`):
 
 The `AuthContext` (`src/lib/context/`) exposes `user`, `userRole`, `isAdmin`. Use `useCustomClaims` hook to read raw JWT claims. Use `useRolePermissions` hook for permission checks in components.
 
+**`userType` (profile display field, not auth):** Values are `'profesional'` and `'proveedor'`. Users registered before the May 2026 simplification may have legacy values (`electrician`, `corporate_pro`, `retailer`, `distributor`, `manufacturer`, `buyer`, `student`, `general`). The badge and label components handle these gracefully with a `'Profesional'` fallback — no crash, but the displayed label won't reflect their original selection until they re-save their profile.
+
 ### Data Layer (React Query)
 - **Query keys**: centralized factory in `src/lib/react-query/constants.ts`
 - **Query hooks**: `src/lib/react-query/queries/use-*.ts`

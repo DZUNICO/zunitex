@@ -2,17 +2,13 @@
 
 'use client';
 
-import { UserRole, UserType } from '@/types/roles';
+import { UserRole, ADMIN_EMAIL } from '@/types/roles';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Shield, 
-  ShieldCheck, 
-  Briefcase, 
-  Store, 
-  Building2, 
-  Factory,
-  ShoppingCart,
-  GraduationCap,
+import { cn } from '@/lib/utils';
+import {
+  Shield,
+  ShieldCheck,
+  Briefcase,
   User as UserIcon
 } from 'lucide-react';
 
@@ -22,7 +18,8 @@ interface RoleBadgeProps {
 }
 
 interface UserTypeBadgeProps {
-  userType: UserType;
+  userType: string; // string para aceptar valores legacy de Firestore sin romper
+  email?: string;
   className?: string;
 }
 
@@ -70,19 +67,29 @@ export function RoleBadge({ role, className }: RoleBadgeProps) {
   );
 }
 
-export function UserTypeBadge({ userType, className }: UserTypeBadgeProps) {
-  const config = {
-    electrician: { label: '⚡ Electricista', variant: 'default' as const },
-    corporate_pro: { label: '👔 Profesional Corporativo', variant: 'secondary' as const },
-    retailer: { label: '🏪 Minorista', variant: 'default' as const },
-    distributor: { label: '📦 Distribuidor', variant: 'default' as const },
-    manufacturer: { label: '🏭 Fabricante', variant: 'default' as const },
-    buyer: { label: '🛒 Comprador', variant: 'default' as const },
-    student: { label: '🎓 Estudiante', variant: 'outline' as const },
-    general: { label: '👤 Usuario General', variant: 'outline' as const }
+export function UserTypeBadge({ userType, email, className }: UserTypeBadgeProps) {
+  if (email === ADMIN_EMAIL) {
+    return (
+      <Badge
+        variant="outline"
+        className={cn(
+          'border-amber-400/70 bg-amber-50/60 text-amber-700 tracking-widest text-[10px] font-semibold',
+          'dark:border-amber-500/40 dark:bg-amber-950/20 dark:text-amber-400',
+          className
+        )}
+      >
+        FUNDADOR
+      </Badge>
+    );
+  }
+
+  const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
+    profesional: { label: '👷 Profesional', variant: 'default' },
+    proveedor:   { label: '🏪 Proveedor',   variant: 'secondary' },
   };
 
-  const { label, variant } = config[userType];
+  // Fallback graceful para valores legacy (electrician, general, etc.)
+  const { label, variant } = config[userType] ?? { label: '👷 Profesional', variant: 'default' as const };
 
   return (
     <Badge variant={variant} className={className}>

@@ -8,6 +8,7 @@ import { ProfileStats } from './profile-stats';
 import { MapPin, Calendar, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ProfileEditDialog } from './profile-edit-dialog';
+import { ADMIN_EMAIL } from '@/types/roles';
 //import { UserProfile, transformUserToProfileHeader } from '@/types/profile';
 
 interface ProfileHeaderProps {
@@ -67,17 +68,13 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
 
   const getUserTypeLabel = (userType: string): string => {
     const labels: Record<string, string> = {
-      'electrician': 'Electricista',
-      'corporate_pro': 'Profesional de Empresa',
-      'retailer': 'Minorista',
-      'distributor': 'Distribuidor',
-      'manufacturer': 'Fabricante',
-      'buyer': 'Comprador',
-      'student': 'Estudiante',
-      'general': 'Usuario General'
+      'profesional': 'Profesional',
+      'proveedor': 'Proveedor',
     };
-    return labels[userType] || userType;
+    return labels[userType] ?? 'Profesional';
   };
+
+  const isFounder = currentProfile.email === ADMIN_EMAIL;
 
   return (
     <div className="space-y-6">
@@ -127,11 +124,15 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
               <h1 className="text-2xl font-bold">
                 {currentProfile.displayName}
-                {currentProfile.userType && (
+                {isFounder ? (
+                  <span className="ml-2 text-sm font-semibold tracking-widest text-amber-600 dark:text-amber-400">
+                    FUNDADOR
+                  </span>
+                ) : currentProfile.userType ? (
                   <span className="text-lg font-normal text-muted-foreground ml-2">
                     ({getUserTypeLabel(currentProfile.userType)})
                   </span>
-                )}
+                ) : null}
               </h1>
               <div className="flex items-center justify-center md:justify-start gap-2">
                 <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
