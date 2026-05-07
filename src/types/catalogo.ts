@@ -21,6 +21,8 @@ export interface ProductoCatalogo {
   fases?: string | null;
   normas?: string | null;
   precio_ref_pen?: number | null;
+  precio_ref_usd?: number | null;
+  codigo_fabricante?: string | null;
   atributos?: AtributosTecnicos | null;
   ficha_tecnica_pdf?: string | null;
   pagina_oficial?: string | null;

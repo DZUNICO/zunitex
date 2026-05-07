@@ -66,6 +66,14 @@ export default function ProductoDetailPage() {
   const [notFound,   setNotFound]   = useState(false);
   const [proveedores, setProveedores] = useState<ProveedorProducto[]>([]);
 
+  // SEO: título dinámico
+  useEffect(() => {
+    if (producto) {
+      document.title = `${producto.modelo} — ${producto.marca} | STARLOGIC`;
+    }
+    return () => { document.title = 'STARLOGIC'; };
+  }, [producto]);
+
   useEffect(() => {
     if (!slug || !marca) return;
 
