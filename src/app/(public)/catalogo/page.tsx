@@ -507,7 +507,15 @@ interface ProveedorRow {
   precio: number | null;
   url_producto: string | null;
   proveedor_id: string;
+  stock: string | null;
   proveedores?: { nombre: string; logo_url: string | null; web: string | null; ciudad?: string | null } | null;
+}
+
+function getStockBadge(stock: string | null) {
+  if (!stock || stock === '' || stock === '0' || stock.toLowerCase() === 'no') {
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">A pedido</span>;
+  }
+  return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">En stock</span>;
 }
 
 function ProductoCard({
@@ -537,7 +545,7 @@ function ProductoCard({
     try {
       const { data: pp, error: err1 } = await catalogoClient
         .from('proveedor_producto')
-        .select('proveedor_id, precio_pen, precio_minimo_pen, activo')
+        .select('proveedor_id, precio_pen, precio_minimo_pen, stock')
         .eq('producto_id', p.id);
 
       if (err1 || !pp || pp.length === 0) { setProveedores([]); return; }
@@ -559,6 +567,7 @@ function ProductoCard({
             proveedor_id: row.proveedor_id,
             precio:       row.precio_pen ?? row.precio_minimo_pen ?? null,
             url_producto: null,
+            stock:        row.stock ?? null,
             proveedores:  provs.find((pv: any) => pv.id === row.proveedor_id) ?? null,
           }))
           .filter((row: any) => row.proveedores !== null)
@@ -629,9 +638,12 @@ function ProductoCard({
                   ))}
                 </div>
                 {p.precio_ref_usd && Number(p.precio_ref_usd) > 0 && (
-                  <span className="text-sm font-semibold text-blue-700 whitespace-nowrap">
-                    S/. {(Number(p.precio_ref_usd) * 0.75 * 3.6).toFixed(2)}
-                  </span>
+                  <div className="text-right">
+                    <div className="text-[10px] text-gray-400 leading-none">Precio ref.</div>
+                    <div className="text-sm font-semibold text-blue-700 whitespace-nowrap">
+                      S/. {(Number(p.precio_ref_usd) * 0.75 * 3.6).toFixed(2)}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -665,6 +677,7 @@ function ProductoCard({
                         {pv?.nombre ?? '—'}
                         {pv?.ciudad && <span className="text-gray-400 font-normal"> ({pv.ciudad})</span>}
                       </span>
+                      {getStockBadge(row.stock)}
                       {row.precio != null && (
                         <span className="text-xs font-mono text-muted-foreground">S/.{row.precio.toFixed(2)}</span>
                       )}
