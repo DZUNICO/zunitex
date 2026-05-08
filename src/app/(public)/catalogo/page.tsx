@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Search, FileText, Zap, Plus, ChevronDown, ChevronUp, X,
+  Search, FileText, Zap, Plus, ChevronDown, X,
   ExternalLink, Loader2, ArrowLeft,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -54,20 +55,56 @@ interface CategoriaPreview {
   imagen_url: string | null;
 }
 
-export default function CatalogoPage() {
+// ─── Componente interno (requiere Suspense por useSearchParams) ───────────────
+function CatalogoInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const categoriaParam = searchParams.get('categoria') ?? 'all';
+  const marcaParam     = searchParams.get('marca')     ?? 'all';
+
   const [search, setSearch] = useState('');
-  const [categoriaFiltro, setCategoriaFiltro] = useState('all');
-  const [marcaFiltro, setMarcaFiltro] = useState('all');
   const [productos, setProductos] = useState<ProductoCatalogo[]>([]);
   const [categorias, setCategorias] = useState<string[]>([]);
-  const [marcas, setMarcas] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+  const [marcas, setMarcas]         = useState<string[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [zoomUrl, setZoomUrl]       = useState<string | null>(null);
   const [categoriasPreview, setCategoriasPreview] = useState<CategoriaPreview[]>([]);
-  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollTop, setShowScrollTop]         = useState(false);
 
-  // Restaurar posición de scroll al volver desde detalle
+  // ── Helpers para actualizar URL ────────────────────────────────────────────
+  const buildUrl = (cat: string, marc: string) => {
+    const p = new URLSearchParams();
+    if (cat  !== 'all') p.set('categoria', cat);
+    if (marc !== 'all') p.set('marca', marc);
+    const q = p.toString();
+    return q ? `/catalogo?${q}` : '/catalogo';
+  };
+
+  const handleCategoryClick = (cat: string) => {
+    setIsFiltering(true);
+    router.push(buildUrl(cat, marcaParam), { scroll: false });
+  };
+
+  const handleCategoriaChange = (cat: string) => {
+    setIsFiltering(true);
+    router.push(buildUrl(cat, marcaParam), { scroll: false });
+  };
+
+  const handleMarcaChange = (marc: string) => {
+    setIsFiltering(true);
+    router.push(buildUrl(categoriaParam, marc), { scroll: false });
+  };
+
+  const handleClearFilters = () => {
+    setSearch('');
+    router.push('/catalogo', { scroll: false });
+    // No limpiar productos — mantener en memoria (Fix 2)
+  };
+
+  // ── Restaurar scroll ───────────────────────────────────────────────────────
   useEffect(() => {
     const saved = sessionStorage.getItem('catalogo_scroll');
     if (saved) {
@@ -76,7 +113,7 @@ export default function CatalogoPage() {
     }
   }, []);
 
-  // Cerrar zoom con Escape
+  // ── Cerrar zoom con Escape ─────────────────────────────────────────────────
   useEffect(() => {
     if (!zoomUrl) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setZoomUrl(null); };
@@ -84,7 +121,7 @@ export default function CatalogoPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [zoomUrl]);
 
-  // Botón scroll-to-top
+  // ── Botón scroll-to-top ────────────────────────────────────────────────────
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
@@ -98,7 +135,7 @@ export default function CatalogoPage() {
     };
   }, []);
 
-  // Cargar filtros + preview de categorías en paralelo
+  // ── Cargar filtros + preview de categorías en paralelo ─────────────────────
   useEffect(() => {
     Promise.all([
       catalogoClient
@@ -135,7 +172,7 @@ export default function CatalogoPage() {
     });
   }, []);
 
-  // Búsqueda con debounce 400ms — capa 0 código + FTS + ILIKE x2
+  // ── Búsqueda con debounce 400ms ────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(async () => {
       setLoading(true);
@@ -147,8 +184,8 @@ export default function CatalogoPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let q: any = catalogoClient.from('productos_catalogo').select('*')
             .eq('disponible_peru', true);
-          if (categoriaFiltro !== 'all') q = q.eq('categoria', categoriaFiltro);
-          if (marcaFiltro !== 'all')     q = q.eq('marca', marcaFiltro);
+          if (categoriaParam !== 'all') q = q.eq('categoria', categoriaParam);
+          if (marcaParam !== 'all')     q = q.eq('marca', marcaParam);
           const { data, error: sbError } = await q.order('marca');
           if (sbError) throw sbError;
           setProductos(data ?? []);
@@ -159,12 +196,12 @@ export default function CatalogoPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let qq = q as any;
           qq = qq.eq('disponible_peru', true);
-          if (categoriaFiltro !== 'all') qq = qq.eq('categoria', categoriaFiltro);
-          if (marcaFiltro !== 'all')     qq = qq.eq('marca', marcaFiltro);
+          if (categoriaParam !== 'all') qq = qq.eq('categoria', categoriaParam);
+          if (marcaParam !== 'all')     qq = qq.eq('marca', marcaParam);
           return qq;
         };
 
-        // Capa 0 — código de fabricante exacto (solo dígitos 5-8 chars)
+        // Capa 0 — código de fabricante exacto
         if (/^\d{5,8}$/.test(trimmed)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data: dataCod } = await (catalogoClient.from('productos_catalogo').select('*') as any)
@@ -172,30 +209,22 @@ export default function CatalogoPage() {
             .eq('disponible_peru', true)
             .limit(10);
           if (dataCod && dataCod.length > 0) {
-            console.log('[catalogo] capa 0 (código) hit:', dataCod.length);
             setProductos(dataCod);
             return;
           }
         }
 
-        // Capa 1 — FTS con variantes de prefijos
+        // Capa 1 — FTS
         const ftsQuery = processSearchQuery(trimmed);
-        console.log('[catalogo] FTS query:', ftsQuery);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let q1: any = catalogoClient.from('productos_catalogo').select('*')
           .textSearch('search_vector', ftsQuery, { type: 'plain', config: 'spanish' });
         q1 = applyFilters(q1);
         const { data: data1, error: err1 } = await q1.order('marca');
-
-        if (!err1 && data1 && data1.length > 0) {
-          console.log('[catalogo] capa 1 hit:', data1.length);
-          setProductos(data1);
-          return;
-        }
+        if (!err1 && data1 && data1.length > 0) { setProductos(data1); return; }
 
         // Capa 2 — ILIKE por token
         const tokens = normalizeText(trimmed).split(' ').filter(Boolean);
-        console.log('[catalogo] capa 2 tokens:', tokens);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let q2: any = catalogoClient.from('productos_catalogo').select('*');
         for (const token of tokens) {
@@ -203,36 +232,30 @@ export default function CatalogoPage() {
         }
         q2 = applyFilters(q2);
         const { data: data2, error: err2 } = await q2.order('marca');
-
-        if (!err2 && data2 && data2.length > 0) {
-          console.log('[catalogo] capa 2 hit:', data2.length);
-          setProductos(data2);
-          return;
-        }
+        if (!err2 && data2 && data2.length > 0) { setProductos(data2); return; }
 
         // Capa 3 — ILIKE full query
-        console.log('[catalogo] capa 3 fallback');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let q3: any = catalogoClient.from('productos_catalogo').select('*')
           .or(`descripcion.ilike.%${trimmed}%,modelo.ilike.%${trimmed}%,marca.ilike.%${trimmed}%`);
         q3 = applyFilters(q3);
         const { data: data3, error: err3 } = await q3.order('marca');
         if (err3) throw err3;
-        console.log('[catalogo] capa 3 hit:', data3?.length ?? 0);
         setProductos(data3 ?? []);
       } catch {
         setError('No se pudo cargar el catálogo. Intenta de nuevo.');
       } finally {
         setLoading(false);
+        setIsFiltering(false); // Fix 1: limpiar isFiltering cuando datos llegan
       }
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [search, categoriaFiltro, marcaFiltro]);
+  }, [search, categoriaParam, marcaParam]);
 
-  const showCategoryView = search === '' && categoriaFiltro === 'all' && marcaFiltro === 'all';
+  const showCategoryView = search === '' && categoriaParam === 'all' && marcaParam === 'all';
   const saveScroll = () => sessionStorage.setItem('catalogo_scroll', String(window.scrollY));
-  //console.log('[render] showScrollTop:', showScrollTop);
+  const showSkeleton = loading || isFiltering; // Fix 1: skeleton durante transición
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -257,7 +280,7 @@ export default function CatalogoPage() {
             className="pl-9"
           />
         </div>
-        <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+        <Select value={categoriaParam} onValueChange={handleCategoriaChange}>
           <SelectTrigger className="w-full sm:w-52">
             <SelectValue placeholder="Categoría" />
           </SelectTrigger>
@@ -268,7 +291,7 @@ export default function CatalogoPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={marcaFiltro} onValueChange={setMarcaFiltro}>
+        <Select value={marcaParam} onValueChange={handleMarcaChange}>
           <SelectTrigger className="w-full sm:w-44">
             <SelectValue placeholder="Marca" />
           </SelectTrigger>
@@ -281,10 +304,10 @@ export default function CatalogoPage() {
         </Select>
       </div>
 
-      {/* Breadcrumb cuando hay categoría activa */}
-      {categoriaFiltro !== 'all' && (
+      {/* Breadcrumb — Fix 2: no limpia productos, solo navega a / */}
+      {categoriaParam !== 'all' && (
         <button
-          onClick={() => setCategoriaFiltro('all')}
+          onClick={handleClearFilters}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -292,8 +315,8 @@ export default function CatalogoPage() {
         </button>
       )}
 
-      {/* Grid de categorías — solo cuando no hay búsqueda ni filtros */}
-      {showCategoryView && !loading && categoriasPreview.length > 0 && (
+      {/* Grid de categorías */}
+      {showCategoryView && !showSkeleton && categoriasPreview.length > 0 && (
         <div className="mb-8">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Explorar por categoría
@@ -302,7 +325,7 @@ export default function CatalogoPage() {
             {categoriasPreview.map((cat) => (
               <button
                 key={cat.categoria}
-                onClick={() => setCategoriaFiltro(cat.categoria)}
+                onClick={() => handleCategoryClick(cat.categoria)}
                 className="flex items-center gap-3 rounded-lg border p-3 text-left hover:shadow-md hover:border-primary/40 transition-all duration-200 bg-card"
               >
                 <div className="w-[60px] h-[60px] flex-shrink-0 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden">
@@ -326,7 +349,7 @@ export default function CatalogoPage() {
       )}
 
       {/* Contador */}
-      {!loading && !error && (
+      {!showSkeleton && !error && (
         <p className="text-sm text-muted-foreground mb-5">
           {productos.length}{' '}
           {productos.length === 1 ? 'producto encontrado' : 'productos encontrados'}
@@ -340,8 +363,8 @@ export default function CatalogoPage() {
         </div>
       )}
 
-      {/* Skeleton */}
-      {loading && (
+      {/* Skeleton — Fix 1: visible tanto con loading como isFiltering */}
+      {showSkeleton && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -367,7 +390,7 @@ export default function CatalogoPage() {
       )}
 
       {/* Sin resultados */}
-      {!loading && !error && productos.length === 0 && (
+      {!showSkeleton && !error && productos.length === 0 && !showCategoryView && (
         <div className="text-center py-20 text-muted-foreground">
           <Search className="h-10 w-10 mx-auto mb-3 opacity-25" />
           <p className="font-medium">
@@ -386,8 +409,8 @@ export default function CatalogoPage() {
         </div>
       )}
 
-      {/* Grid de productos — solo cuando hay búsqueda o filtro activo */}
-      {!showCategoryView && !loading && !error && productos.length > 0 && (
+      {/* Grid de productos */}
+      {!showSkeleton && !showCategoryView && !error && productos.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {productos.map((p) => (
             <ProductoCard key={p.id} producto={p} onImageClick={setZoomUrl} onDetailsClick={saveScroll} />
@@ -450,6 +473,36 @@ export default function CatalogoPage() {
   );
 }
 
+// ─── Export público — Suspense requerido por useSearchParams ──────────────────
+export default function CatalogoPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <div className="h-8 bg-muted rounded w-80 mb-2 animate-pulse" />
+          <div className="h-4 bg-muted rounded w-60 animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-3">
+                <div className="h-5 bg-muted rounded w-2/3" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="h-3 bg-muted rounded w-full" />
+                <div className="h-3 bg-muted rounded w-4/5" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    }>
+      <CatalogoInner />
+    </Suspense>
+  );
+}
+
+// ─── Tipos y componente de card ───────────────────────────────────────────────
 interface ProveedorRow {
   precio: number | null;
   url_producto: string | null;
@@ -487,38 +540,29 @@ function ProductoCard({
         .select('proveedor_id, precio_pen, precio_minimo_pen, activo')
         .eq('producto_id', p.id);
 
-      //console.log('[prov] pp:', pp, err1);
-
-      if (err1 || !pp || pp.length === 0) {
-        setProveedores([]);
-        return;
-      }
+      if (err1 || !pp || pp.length === 0) { setProveedores([]); return; }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ids = (pp as any[]).map((r: any) => r.proveedor_id).filter(Boolean);
-      const { data: provs, error: err2 } = await catalogoClient
+      const { data: provs } = await catalogoClient
         .from('proveedores')
         .select('id, nombre, slug, ciudad, logo_url, telefono, web')
         .in('id', ids);
 
-      //console.log('[prov] provs:', provs, err2);
-
-      if (!provs) {
-        setProveedores([]);
-        return;
-      }
+      if (!provs) { setProveedores([]); return; }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = (pp as any[])
-        .map((row: any) => ({
-          proveedor_id: row.proveedor_id,
-          precio:       row.precio_pen ?? row.precio_minimo_pen ?? null,
-          url_producto: null,
-          proveedores:  provs.find((pv: any) => pv.id === row.proveedor_id) ?? null,
-        }))
-        .filter((row: any) => row.proveedores !== null);
-
-      setProveedores(result);
+      setProveedores(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (pp as any[])
+          .map((row: any) => ({
+            proveedor_id: row.proveedor_id,
+            precio:       row.precio_pen ?? row.precio_minimo_pen ?? null,
+            url_producto: null,
+            proveedores:  provs.find((pv: any) => pv.id === row.proveedor_id) ?? null,
+          }))
+          .filter((row: any) => row.proveedores !== null)
+      );
     } catch (e) {
       console.error('[prov] error:', e);
       setProveedores([]);
@@ -536,9 +580,7 @@ function ProductoCard({
     <Card className="flex flex-col hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-4 flex flex-col flex-1 gap-3">
 
-        {/* Fila principal: imagen + contenido */}
         <div className="flex gap-3">
-          {/* Imagen */}
           <div
             className={`flex-shrink-0 rounded-md overflow-hidden bg-gray-50 flex items-center justify-center w-20 h-20 md:w-24 md:h-24 ${p.imagen_url ? 'cursor-zoom-in' : ''}`}
             onClick={() => p.imagen_url && onImageClick(p.imagen_url)}
@@ -556,9 +598,7 @@ function ProductoCard({
             )}
           </div>
 
-          {/* Contenido */}
           <div className="flex-1 min-w-0">
-            {/* Marca + Categoría */}
             <div className="flex items-center gap-1.5 flex-wrap mb-1">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {p.marca}
@@ -566,12 +606,10 @@ function ProductoCard({
               <Badge variant="secondary" className="shrink-0 text-xs">{p.categoria}</Badge>
             </div>
 
-            {/* Descripción */}
             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug line-clamp-2">
               {p.descripcion}
             </p>
 
-            {/* Modelo + código fabricante */}
             <div className="flex items-center justify-between mt-0.5">
               <span className="text-xs text-gray-500 font-mono truncate">{p.modelo}</span>
               {p.codigo_fabricante && (
@@ -581,7 +619,6 @@ function ProductoCard({
               )}
             </div>
 
-            {/* Badges técnicos + precio referencial */}
             {(atributoBadges.length > 0 || (p.precio_ref_usd && Number(p.precio_ref_usd) > 0)) && (
               <div className="flex items-center justify-between gap-2 mt-1.5">
                 <div className="flex flex-wrap gap-1">
@@ -593,7 +630,7 @@ function ProductoCard({
                 </div>
                 {p.precio_ref_usd && Number(p.precio_ref_usd) > 0 && (
                   <span className="text-sm font-semibold text-blue-700 whitespace-nowrap">
-                    S/ {(Number(p.precio_ref_usd) * 0.75 * 3.6).toFixed(2)}
+                    S/. {(Number(p.precio_ref_usd) * 0.75 * 3.6).toFixed(2)}
                   </span>
                 )}
               </div>
@@ -601,7 +638,6 @@ function ProductoCard({
           </div>
         </div>
 
-        {/* Panel de proveedores expandible */}
         {showProveedores && (
           <div className="border rounded-md p-3 bg-muted/30 text-sm">
             {loadingProv ? (
@@ -619,13 +655,7 @@ function ProductoCard({
                   return (
                     <li key={i} className="flex items-center gap-2">
                       {pv?.logo_url ? (
-                        <img
-                          src={pv.logo_url}
-                          alt={pv.nombre}
-                          className="w-6 h-6 rounded object-contain flex-shrink-0"
-                          loading="lazy"
-                          decoding="async"
-                        />
+                        <img src={pv.logo_url} alt={pv.nombre} className="w-6 h-6 rounded object-contain flex-shrink-0" loading="lazy" decoding="async" />
                       ) : (
                         <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {pv?.nombre?.charAt(0) ?? '?'}
@@ -633,20 +663,14 @@ function ProductoCard({
                       )}
                       <span className="text-xs font-medium flex-1 truncate">
                         {pv?.nombre ?? '—'}
-                        {pv?.ciudad && (
-                          <span className="text-gray-400 font-normal"> ({pv.ciudad})</span>
-                        )}
+                        {pv?.ciudad && <span className="text-gray-400 font-normal"> ({pv.ciudad})</span>}
                       </span>
                       {row.precio != null && (
-                        <span className="text-xs font-mono">S/ {row.precio.toFixed(2)}</span>
+                        <span className="text-xs font-mono text-muted-foreground">S/.{row.precio.toFixed(2)}</span>
                       )}
                       {link && (
-                        <a
-                          href={link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline flex items-center gap-0.5 flex-shrink-0"
-                        >
+                        <a href={link} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline flex items-center gap-0.5 flex-shrink-0">
                           Ver <ExternalLink className="h-2.5 w-2.5" />
                         </a>
                       )}
@@ -658,31 +682,18 @@ function ProductoCard({
           </div>
         )}
 
-        {/* Footer: 4 botones */}
         <div className="flex flex-wrap items-center gap-1.5 mt-auto pt-3 border-t">
-          {/* RFQ */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs h-7 px-2 gap-1"
-            onClick={() => alert('Función próximamente disponible')}
-          >
+          <Button variant="outline" size="sm" className="text-xs h-7 px-2 gap-1"
+            onClick={() => alert('Función próximamente disponible')}>
             <Plus className="h-3 w-3" />
             RFQ
           </Button>
 
-          {/* Proveedores */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs h-7 px-2 gap-1"
-            onClick={toggleProveedores}
-          >
+          <Button variant="outline" size="sm" className="text-xs h-7 px-2 gap-1" onClick={toggleProveedores}>
             Proveedores
             <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showProveedores ? 'rotate-180' : ''}`} />
           </Button>
 
-          {/* PDF */}
           {p.ficha_tecnica_pdf && (
             <Button variant="outline" size="sm" className="text-xs h-7 px-2 gap-1" asChild>
               <a href={p.ficha_tecnica_pdf} target="_blank" rel="noopener noreferrer">
@@ -692,15 +703,8 @@ function ProductoCard({
             </Button>
           )}
 
-          {/* Ver detalles */}
           {href ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs h-7 px-2 ml-auto"
-              asChild
-              onClick={onDetailsClick}
-            >
+            <Button variant="outline" size="sm" className="text-xs h-7 px-2 ml-auto" asChild onClick={onDetailsClick}>
               <Link href={href}>Ver detalles</Link>
             </Button>
           ) : (
