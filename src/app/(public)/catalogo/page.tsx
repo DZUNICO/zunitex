@@ -641,7 +641,7 @@ function ProductoCard({
                   <div className="text-right">
                     <div className="text-[10px] text-gray-400 leading-none">Precio ref.</div>
                     <div className="text-sm font-semibold text-blue-700 whitespace-nowrap">
-                      S/. {(Number(p.precio_ref_usd) * 0.75 * 3.6).toFixed(2)}
+                      S/ {(Number(p.precio_ref_usd) * 0.75 * 3.6).toFixed(2)}
                     </div>
                   </div>
                 )}
@@ -675,11 +675,11 @@ function ProductoCard({
                       )}
                       <span className="text-xs font-medium flex-1 truncate">
                         {pv?.nombre ?? '—'}
-                        {pv?.ciudad && <span className="text-gray-400 font-normal"> ({pv.ciudad})</span>}
+                        {pv?.ciudad && <span className="text-gray-700 font-normal"> ({pv.ciudad})</span>}
                       </span>
                       {getStockBadge(row.stock)}
                       {row.precio != null && (
-                        <span className="text-xs font-mono text-muted-foreground">S/.{row.precio.toFixed(2)}</span>
+                        <span className="text-xs font-mono text-gray-900 font-medium">S/{row.precio.toFixed(2)}</span>
                       )}
                       {link && (
                         <a href={link} target="_blank" rel="noopener noreferrer"
