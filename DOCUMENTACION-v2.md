@@ -144,9 +144,9 @@ La plataforma está construida con tecnologías modernas y escalables, utilizand
 
 ### Estado Actual
 
-**✅ Production-Ready**
+**✅ En Desarrollo Activo — Catálogo CHINT live**
 
-La plataforma está completamente funcional y lista para producción con las siguientes características implementadas:
+La plataforma está completamente funcional con las siguientes características implementadas:
 
 - ✅ **14 Cloud Functions** deployadas y funcionando (contadores automáticos)
 - ✅ **40 índices compuestos** de Firestore creados y optimizados
@@ -154,8 +154,9 @@ La plataforma está completamente funcional y lista para producción con las sig
 - ✅ **Sentry** integrado para error tracking y performance monitoring
 - ✅ **Vercel Analytics + Speed Insights** configurados
 - ✅ **Optimistic updates** implementados en likes y follows
-- ✅ **Código refactorizado** y optimizado (Grupo 1 completado)
-- ✅ **Emulador deshabilitado** (usa Firestore de producción)
+- ✅ **Catálogo CHINT** — 480 productos con búsqueda FTS, filtros y detalle de producto
+- ✅ **Supabase** — base de datos de catálogo separada de Firestore
+- ✅ **Sistema de roles simplificado** — 3 roles, 2 userTypes
 
 ### Capacidad
 
@@ -163,11 +164,44 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ### Fecha de Última Actualización
 
-**Diciembre 2025** - Versión 2.0
+**Mayo 2026** - Versión 2.1 (sistema de roles simplificado + catálogo CHINT live)
 
 ---
 
 ## 📋 REGISTRO DE CAMBIOS
+
+### [Mayo 2026] — Auditoría completa + simplificación de roles + catálogo CHINT
+
+**Cambios realizados:**
+
+- **src/types/roles.ts**: `UserRole` reducido a 3 valores (`admin | verified_seller | user`); eliminados `moderator`, `corporate_pro`, `verified_pro`. `UserType` ya tenía solo `profesional | proveedor`. `RolePermissions` simplificado.
+- **src/hooks/useRolePermissions.ts**: Reescrito con `isAdmin`, `isVerifiedSeller`, `canOfferProducts`, `canViewCatalog`; eliminados permisos de moderación/capacitación.
+- **src/components/shared/role-badge.tsx**: `RoleBadge` para `user` retorna null; valores desconocidos retornan null; colores actualizados (admin=negro, verified_seller=azul).
+- **src/components/profile/profile-header.tsx**: `getUserTypeLabel` retorna `''` para valores desconocidos (no más fallback a "Profesional").
+- **src/app/(public)/blog/[id]/page.tsx**: Fix — `isAdmin` ya no usa email hardcodeado, usa `userRole === 'admin'`.
+- **src/components/shared/protected-navbar.tsx**: Fix — link Admin usa `userRole === 'admin'` en lugar de `user?.email === '...'`.
+- **src/types/index.ts**: Eliminados campos legacy `electricianInfo` y `corporateProInfo`; renombrado `providerInfo` → `proveedorInfo`.
+- **src/lib/firebase/init-db.ts**: `role: 'electrician'` corregido a `role: 'user'` (era error de TypeScript).
+- **firestore.rules**: `canModerate()` simplificado a `isAdmin()` (eliminado 'moderator'); removida `canGiveTraining()` (roles eliminados); regla `users create` ya no acepta userTypes legacy.
+- **DOCUMENTACION-v2.md**: Sección de roles reescrita, fecha actualizada, sección Supabase agregada, variables de entorno completadas.
+
+**Catálogo CHINT (commits anteriores):**
+- 480 productos en Supabase con búsqueda FTS, filtros por URL params, Suspense
+- Páginas `/catalogo`, `/catalogo/[marca]/[slug]`, `/proveedores`
+- ProductoCard con imagen, badges técnicos, precio ref, panel de proveedores con stock
+
+**NO modificado (requiere redeploy):**
+- `functions/src/custom-claims.ts` — `UserRole` interno aún incluye 6 roles legacy. Functionally no es problema porque `getInitialRole()` solo asigna `'admin'` o `'user'`. Actualizar en próximo deploy.
+
+**Archivos modificados:**
+- `src/types/roles.ts`, `src/hooks/useRolePermissions.ts`, `src/components/shared/role-badge.tsx`
+- `src/components/profile/profile-header.tsx`, `src/app/(public)/blog/[id]/page.tsx`
+- `src/components/shared/protected-navbar.tsx`, `src/types/index.ts`
+- `src/lib/firebase/init-db.ts`, `firestore.rules`, `DOCUMENTACION-v2.md`
+
+**Estado:** ✅ Completado (firestore.rules pendiente de `firebase deploy --only firestore:rules`)
+
+---
 
 ### [2025-12-09] - Corrección de estructura de usuarios y accesibilidad
 
@@ -1227,6 +1261,62 @@ firebase deploy --only storage
 
 ---
 
+## 🗄️ Supabase — Catálogo de Productos
+
+**Proyecto:** STARLOGIC-CATALOGO
+**URL:** https://cnjvtzwsqzzvqfdbaisv.supabase.co
+**Cliente:** `src/lib/supabase/catalogo-client.ts`
+
+### Tablas
+
+| Tabla | Descripción |
+|-------|-------------|
+| `productos_catalogo` | 480 productos CHINT (77 ocultos con `disponible_peru=false`) |
+| `proveedores` | 3 proveedores verificados (Electromack, MANELSA, Dagor) |
+| `proveedor_producto` | Relación proveedor-producto con precios y stock |
+
+### Schema productos_catalogo (campos clave)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `codigo_fabricante` | text | Código numérico del fabricante (ej: 814009) |
+| `marca`, `modelo`, `descripcion`, `categoria` | text | Datos básicos |
+| `slug` | text | URL-friendly para la ruta `/catalogo/[marca]/[slug]` |
+| `atributos` | jsonb | Specs técnicas por categoría (corriente_a, polos, ruptura_ka, etc.) |
+| `precio_ref_usd` | numeric | Precio lista del importador |
+| `precio_ref_pen` | numeric | Precio en soles (calculado en UI: `precio_ref_usd × 0.70 × 3.60`) |
+| `disponible_peru` | bool | FALSE = producto oculto en catálogo |
+| `ficha_tecnica_pdf`, `pagina_oficial` | text | URLs de documentación técnica |
+| `search_vector` | tsvector | Para FTS en español (índice GIN) |
+
+### Búsqueda — 3 capas (en orden de prioridad)
+
+1. **Capa 0** — Si query es código numérico (5-8 dígitos): busca exacto por `codigo_fabricante`
+2. **Capa 1** — FTS con `textSearch('search_vector', query, {type:'plain', config:'spanish'})`
+3. **Capa 2-3** — Fallback a `.ilike()` por tokens y query completa
+
+### Precio referencial en UI
+
+NO se guarda en BD. Se calcula en tiempo real:
+```
+precio_ref_usd × 0.70 (descuento mínimo importador) × 3.60 (tipo de cambio fijo)
+```
+
+### Rutas del catálogo
+
+- `/catalogo` — Grid de categorías + búsqueda + filtros (URL params: `?categoria=X&marca=Y`)
+- `/catalogo/[marca]/[slug]` — Detalle del producto con especificaciones y proveedores
+- `/proveedores` — Directorio de proveedores
+
+### Notas de arquitectura
+
+- Supabase usa una instancia **separada** de Firebase (otro proyecto, otro cliente)
+- FK embedding no soportado sin FK registrado → se usan **dos queries separadas** en JS para proveedores
+- El campo `activo` en `proveedor_producto` se ignoró porque los datos no lo tienen seteado
+- Columna en `proveedores` es `web` (no `sitio_web`)
+
+---
+
 ## 5. BASE DE DATOS
 
 ### 5.1 Colecciones Principales
@@ -1482,6 +1572,10 @@ NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn
 SENTRY_AUTH_TOKEN=your_sentry_auth_token
 SENTRY_ORG=starlogic
 SENTRY_PROJECT=javascript-nextjs
+
+# Supabase — Catálogo de Productos (base de datos separada)
+NEXT_PUBLIC_SUPABASE_CATALOGO_URL=https://cnjvtzwsqzzvqfdbaisv.supabase.co
+NEXT_PUBLIC_SUPABASE_CATALOGO_ANON=[anon key]
 
 # Environment
 NODE_ENV=production

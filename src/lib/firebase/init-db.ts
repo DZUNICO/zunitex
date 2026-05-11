@@ -73,7 +73,7 @@ export async function seedDatabase(userId: string) {
     const userData = {
       email: 'usuario@ejemplo.com',
       displayName: 'Usuario Ejemplo',
-      role: 'electrician',
+      role: 'user',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       projectsCount: 2, // Número de proyectos que crearemos

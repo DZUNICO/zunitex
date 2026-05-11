@@ -62,7 +62,7 @@ const menuItems = [
 ];
 
 export function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, userRole, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -131,7 +131,7 @@ export function Navbar() {
               STARLOGIC
             </span>
           </Link>
-          {user?.email === 'diego.zuni@gmail.com' && (
+          {userRole === 'admin' && (
             <Link href="/admin/blog" className="...">
               Admin
             </Link>

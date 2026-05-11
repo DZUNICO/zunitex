@@ -28,22 +28,7 @@ export interface User {
   rejectionReason?: string;
   
   // INFORMACIÓN ADICIONAL SEGÚN TIPO
-  electricianInfo?: {
-    experience?: string;
-    certifications?: string[];
-    services?: string[];
-    licenseNumber?: string;
-  };
-  
-  corporateProInfo?: {
-    companyName: string;      // Nombre de la empresa
-    companyId?: string;       // UID de la cuenta corporativa en Firestore
-    position: string;         // Cargo (ej: "Especialista de Automatización")
-    department?: string;
-    corporateEmail?: string;  // Email corporativo
-  };
-  
-  providerInfo?: {
+  proveedorInfo?: {
     companyName?: string;
     ruc?: string;             // RUC (Perú)
     address?: string;

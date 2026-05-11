@@ -47,27 +47,18 @@ service cloud.firestore {
     }
     
     /**
-     * Verifica que el usuario es admin o moderator
+     * Verifica que el usuario puede moderar (solo admin)
      */
     function canModerate() {
-      return isAuthenticated() && 
-             request.auth.token.role in ['admin', 'moderator'];
+      return isAdmin();
     }
-    
+
     /**
      * Verifica que el usuario puede publicar recursos
      */
     function canPublishResources() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
              request.auth.token.role in ['admin', 'verified_seller'];
-    }
-    
-    /**
-     * Verifica que el usuario puede dar capacitaciones
-     */
-    function canGiveTraining() {
-      return isAuthenticated() && 
-             request.auth.token.role in ['admin', 'moderator', 'corporate_pro', 'verified_seller', 'verified_pro'];
     }
     
     /**
@@ -85,14 +76,9 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       
       // Creación: Solo cuando el usuario se registra (auth.uid == userId)
-      // TEMPORAL: acepta valores legacy mientras corre la migración migrateUserTypes
       allow create: if isOwner(userId) &&
-                      request.resource.data.role == 'user' && // Role inicial siempre 'user'
-                      request.resource.data.userType in [
-                        'profesional', 'proveedor',
-                        'electrician', 'corporate_pro', 'retailer',
-                        'distributor', 'manufacturer', 'buyer', 'student', 'general'
-                      ];
+                      request.resource.data.role == 'user' &&
+                      request.resource.data.userType in ['profesional', 'proveedor'];
       
       // Actualización: Propio usuario o admin
       allow update: if (isOwner(userId) || isAdmin()) &&
