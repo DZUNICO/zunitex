@@ -28,7 +28,7 @@ const MDMarkdown = dynamic(
 );
 
 export default function BlogPostPage() {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const params = useParams();
   const postId = typeof params.id === 'string' ? params.id : undefined;
   
@@ -75,7 +75,7 @@ export default function BlogPostPage() {
     ? post.createdAt 
     : new Date(post.createdAt);
 
-  const isAdmin = user?.email === 'diego.zuni@gmail.com';
+  const isAdmin = userRole === 'admin';
 
   const handleSave = () => {
     // TODO: Implementar actualización de blog post

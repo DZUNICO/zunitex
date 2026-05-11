@@ -68,10 +68,10 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
 
   const getUserTypeLabel = (userType: string): string => {
     const labels: Record<string, string> = {
-      'profesional': 'Profesional',
-      'proveedor': 'Proveedor',
+      profesional: 'Profesional',
+      proveedor:   'Proveedor',
     };
-    return labels[userType] ?? 'Profesional';
+    return labels[userType] ?? '';
   };
 
   const isFounder = currentProfile.email === ADMIN_EMAIL;

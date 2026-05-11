@@ -5,12 +5,7 @@
 import { UserRole, ADMIN_EMAIL } from '@/types/roles';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import {
-  Shield,
-  ShieldCheck,
-  Briefcase,
-  User as UserIcon
-} from 'lucide-react';
+import { Shield, ShieldCheck } from 'lucide-react';
 
 interface RoleBadgeProps {
   role: UserRole;
@@ -18,53 +13,29 @@ interface RoleBadgeProps {
 }
 
 interface UserTypeBadgeProps {
-  userType: string; // string para aceptar valores legacy de Firestore sin romper
+  userType: string;
   email?: string;
   className?: string;
 }
 
 export function RoleBadge({ role, className }: RoleBadgeProps) {
-  const config = {
-    admin: { 
-      label: 'Admin', 
-      icon: Shield, 
-      variant: 'destructive' as const 
-    },
-    moderator: { 
-      label: 'Moderador', 
-      icon: ShieldCheck, 
-      variant: 'default' as const 
-    },
-    corporate_pro: { 
-      label: 'Profesional Corporativo', 
-      icon: Briefcase, 
-      variant: 'secondary' as const 
-    },
-    verified_seller: { 
-      label: 'Vendedor Verificado', 
-      icon: ShieldCheck, 
-      variant: 'default' as const 
-    },
-    verified_pro: { 
-      label: 'Profesional Verificado', 
-      icon: ShieldCheck, 
-      variant: 'default' as const 
-    },
-    user: { 
-      label: 'Usuario', 
-      icon: UserIcon, 
-      variant: 'outline' as const 
-    }
-  };
-
-  const { label, icon: Icon, variant } = config[role];
-
-  return (
-    <Badge variant={variant} className={className}>
-      <Icon className="mr-1 h-3 w-3" />
-      {label}
-    </Badge>
-  );
+  if (role === 'admin') {
+    return (
+      <Badge className={cn('bg-black text-white hover:bg-black/90', className)}>
+        <Shield className="mr-1 h-3 w-3" />
+        Admin
+      </Badge>
+    );
+  }
+  if (role === 'verified_seller') {
+    return (
+      <Badge className={cn('bg-blue-600 text-white hover:bg-blue-700', className)}>
+        <ShieldCheck className="mr-1 h-3 w-3" />
+        Proveedor Verificado
+      </Badge>
+    );
+  }
+  return null;
 }
 
 export function UserTypeBadge({ userType, email, className }: UserTypeBadgeProps) {
@@ -83,25 +54,21 @@ export function UserTypeBadge({ userType, email, className }: UserTypeBadgeProps
     );
   }
 
-  const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
-    profesional: { label: '👷 Profesional', variant: 'default' },
-    proveedor:   { label: '🏪 Proveedor',   variant: 'secondary' },
-  };
+  if (userType === 'proveedor') {
+    return (
+      <Badge className={cn('bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300', className)}>
+        🏪 Proveedor
+      </Badge>
+    );
+  }
 
-  // Fallback graceful para valores legacy (electrician, general, etc.)
-  const { label, variant } = config[userType] ?? { label: '👷 Profesional', variant: 'default' as const };
+  if (userType === 'profesional') {
+    return (
+      <Badge variant="secondary" className={cn(className)}>
+        👷 Profesional
+      </Badge>
+    );
+  }
 
-  return (
-    <Badge variant={variant} className={className}>
-      {label}
-    </Badge>
-  );
+  return null;
 }
-
-
-
-
-
-
-
-

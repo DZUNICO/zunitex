@@ -913,232 +913,68 @@ firebase functions:list
 
 ## 👥 Sistema de Roles y Tipos de Usuario
 
-### Arquitectura del Sistema de Permisos
+### Roles (qué puede hacer el usuario)
 
-STARLOGIC usa **Custom Claims de Firebase** para gestionar roles y permisos de forma escalable y segura.
-
-**Filosofía:**
-
-- Custom Claims = Permisos y roles
-- Firestore users collection = Información de perfil
-- Cloud Functions = Sincronización automática
-
----
-
-### 6 Roles Principales (UserRole)
-
-Los roles determinan QUÉ puede hacer un usuario:
-
-| Role | Descripción | Permisos |
-|------|-------------|----------|
-| `admin` | Administrador del sistema (Diego) | Control total, gestiona roles, modera todo |
-| `moderator` | Empleados futuros | Modera contenido, gestiona reportes |
-| `corporate_pro` | Profesionales de empresas | Publicar recursos empresariales, capacitaciones |
-| `verified_seller` | Vendedores verificados | Publicar productos en marketplace |
-| `verified_pro` | Profesionales independientes verificados | Badge verificado, servicios premium |
-| `user` | Usuario básico (default) | Crear posts, proyectos, comentar |
-
-**Ubicación del tipo:** `src/types/roles.ts`
+| Role | Descripción |
+|------|-------------|
+| `admin` | Administrador — control total (solo Diego) |
+| `verified_seller` | Proveedor verificado — puede ofrecer productos en catálogo |
+| `user` | Usuario estándar — puede ver catálogo, crear posts, proyectos |
 
 ```typescript
-export type UserRole = 
-  | 'admin' 
-  | 'moderator' 
-  | 'corporate_pro' 
-  | 'verified_seller' 
-  | 'verified_pro' 
-  | 'user';
+// src/types/roles.ts
+export type UserRole = 'admin' | 'verified_seller' | 'user';
 ```
 
----
+### Tipos de Usuario (quién es el usuario)
 
-### 8 Tipos de Usuario (UserType)
-
-Los tipos determinan QUIÉN es el usuario (perfil):
-
-| Type | Descripción | Traducción UI |
-|------|-------------|---------------|
-| `electrician` | Electricista independiente | "Electricista" |
-| `corporate_pro` | Profesional de empresa | "Profesional de Empresa" |
-| `retailer` | Minorista | "Minorista" |
-| `distributor` | Distribuidor mayorista | "Distribuidor" |
-| `manufacturer` | Fabricante/dueño de marca | "Fabricante" |
-| `buyer` | Comprador (empresa/constructora) | "Comprador" |
-| `student` | Estudiante | "Estudiante" |
-| `general` | Usuario general | "Usuario General" |
-
-**Ubicación del tipo:** `src/types/roles.ts`
+| UserType | Descripción |
+|----------|-------------|
+| `profesional` | Electricistas, técnicos, ingenieros, empresas constructoras |
+| `proveedor` | Distribuidores, ferreterías, importadores de materiales eléctricos |
 
 ```typescript
-export type UserType = 
-  | 'electrician' 
-  | 'corporate_pro' 
-  | 'retailer' 
-  | 'distributor' 
-  | 'manufacturer' 
-  | 'buyer' 
-  | 'student' 
-  | 'general';
+export type UserType = 'profesional' | 'proveedor';
 ```
 
----
+### Reglas
 
-### Custom Claims en Firebase Auth
+- Al registrarse: `role = 'user'`, `userType = 'profesional'` (default)
+- Para ser `verified_seller`: el admin asigna el role manualmente via Cloud Function `updateCustomClaims`
+- El `firebase_uid` del proveedor se vincula en la tabla `proveedores` de Supabase
 
-**Estructura de Custom Claims:**
+### Custom Claims (Firebase Auth)
 
 ```typescript
 interface CustomClaims {
-  role: UserRole;      // Role principal del usuario
-  admin: boolean;      // true si role === 'admin'
+  role: UserRole;
+  admin: boolean; // true solo si role === 'admin'
 }
 ```
 
 **Cómo se asignan:**
-
-1. Usuario se registra → Role inicial: `user`, Type inicial: `general`
+1. Usuario se registra → Claims iniciales: `{ role: 'user', admin: false }`
 2. Admin usa Cloud Function `updateCustomClaims` para cambiar role
-3. Cloud Function sincroniza con Firestore (collection `users`)
-4. Usuario debe refrescar token para ver cambios
-
-**Cloud Function relevante:**
-
-- `updateCustomClaims` - Actualiza roles de usuarios
-
----
-
-### Flujo de Verificación de Usuarios
-
-**Estado actual:** Manual por admin
-
-**Proceso:**
-
-1. Usuario solicita verificación (futuro: formulario)
-2. Admin revisa credenciales
-3. Admin ejecuta función para actualizar role:
-   - `verified_pro` → Profesionales independientes
-   - `verified_seller` → Vendedores de productos
-   - `corporate_pro` → Profesionales de empresas
-
-**Futuro (Año 2):**
-
-- Verificación semi-automática con requisitos claros
-- RUC válido, documentos, referencias
-- Review manual solo en casos dudosos
-
----
+3. Usuario refresca token para ver cambios (`refreshToken()` en AuthContext)
 
 ### Permisos en Firestore Rules
 
-**Funciones helper en firestore.rules:**
-
 ```javascript
-function isAuthenticated() {
-  return request.auth != null;
-}
-
 function isAdmin() {
-  return isAuthenticated() && 
-         request.auth.token.admin == true;
-}
-
-function hasRole(role) {
-  return isAuthenticated() && 
-         request.auth.token.role == role;
-}
-
-function canModerate() {
-  return isAuthenticated() && 
-         request.auth.token.role in ['admin', 'moderator'];
+  return request.auth != null && request.auth.token.admin == true;
 }
 
 function canPublishResources() {
-  return isAuthenticated() && 
+  return request.auth != null &&
          request.auth.token.role in ['admin', 'verified_seller'];
 }
 ```
 
-**Ejemplo de uso:**
+### Vinculación proveedor → Supabase
 
-```javascript
-// Solo admin y verified_seller pueden publicar recursos
-match /resources/{resourceId} {
-  allow create: if canPublishResources();
-  allow update: if isOwner(resource.data.createdBy) || isAdmin();
-}
-```
-
----
-
-### UI de Tipos de Usuario
-
-**Traducción de tipos en español:**
-
-**Ubicación:** `src/components/profile/profile-header.tsx`
-
-```typescript
-const getUserTypeLabel = (userType: string): string => {
-  const labels: Record<string, string> = {
-    'electrician': 'Electricista',
-    'corporate_pro': 'Profesional de Empresa',
-    'retailer': 'Minorista',
-    'distributor': 'Distribuidor',
-    'manufacturer': 'Fabricante',
-    'buyer': 'Comprador',
-    'student': 'Estudiante',
-    'general': 'Usuario General'
-  };
-  return labels[userType] || userType;
-};
-```
-
-**Componente ProfileHeader:**
-
-- Muestra tipo de usuario traducido al español
-- Badge según el role (verified_pro, verified_seller, etc.)
-- Validación defensiva para specialties y campos opcionales
-
----
-
-### Casos de Uso por Role
-
-**Admin:**
-
-- Gestiona todos los roles
-- Modera todo el contenido
-- Acceso al panel de administración (futuro)
-- Puede eliminar cualquier contenido
-
-**Moderator:**
-
-- Modera posts de comunidad y blog
-- Gestiona reportes de usuarios
-- No puede cambiar roles
-
-**Corporate_pro:**
-
-- Publica capacitaciones empresariales
-- Representa a una empresa
-- Badge "Profesional de Empresa"
-
-**Verified_seller:**
-
-- Publica productos en marketplace
-- Vende materiales eléctricos
-- Badge "Vendedor Verificado"
-
-**Verified_pro:**
-
-- Profesional independiente verificado
-- Badge "Profesional Verificado"
-- Puede ofrecer servicios premium
-
-**User:**
-
-- Crea posts en comunidad
-- Crea proyectos en portafolio
-- Comenta y da likes
-- Acceso básico a la plataforma
+Cuando un proveedor verificado se registra:
+1. Admin asigna `role: 'verified_seller'` via `updateCustomClaims`
+2. Admin actualiza `firebase_uid` en tabla `proveedores` de Supabase con el UID del usuario
 
 ---
 
@@ -1291,25 +1127,20 @@ Los siguientes contadores se actualizan mediante Cloud Functions (recomendado) o
 
 Ver sección completa **[👥 Sistema de Roles y Tipos de Usuario](#-sistema-de-roles-y-tipos-de-usuario)** para información detallada.
 
-**Resumen:**
+**Roles:**
 
-| Rol | Descripción | Permisos |
-|-----|-------------|----------|
-| `admin` | Administrador del sistema | Control total, gestiona roles, modera todo |
-| `moderator` | Moderador | Modera contenido, gestiona reportes |
-| `corporate_pro` | Profesional de empresa | Publicar recursos empresariales, capacitaciones |
-| `verified_seller` | Vendedor verificado | Publicar productos en marketplace |
-| `verified_pro` | Profesional verificado | Badge verificado, servicios premium |
-| `user` | Usuario básico (default) | Crear posts, proyectos, comentar |
+| Role | Descripción |
+|------|-------------|
+| `admin` | Administrador — control total (solo Diego) |
+| `verified_seller` | Proveedor verificado — puede ofrecer productos en catálogo |
+| `user` | Usuario estándar — ver catálogo, crear posts, proyectos |
 
 **Tipos de Usuario (UserType):**
 
-Los tipos determinan QUIÉN es el usuario (perfil de negocio):
-- `electrician`, `corporate_pro`, `retailer`, `distributor`, `manufacturer`, `buyer`, `student`, `general`
-
-**Admin Principal:**
-- Email: `diego.zuni@gmail.com`
-- Acceso: Panel de administración, creación de blog posts, gestión de recursos, asignación de roles
+| UserType | Descripción |
+|----------|-------------|
+| `profesional` | Electricistas, técnicos, ingenieros, constructoras |
+| `proveedor` | Distribuidores, ferreterías, importadores |
 
 ### 4.3 Rate Limiting
 
