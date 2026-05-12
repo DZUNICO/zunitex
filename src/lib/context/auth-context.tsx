@@ -27,6 +27,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
+  refetchClaims: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -40,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   
   // Obtener custom claims
-  const { claims, loading: claimsLoading } = useCustomClaims(user);
+  const { claims, loading: claimsLoading, refetchClaims } = useCustomClaims(user);
 
   useEffect(() => {
     // Configurar persistencia
@@ -149,7 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signIn,
     logout,
-    refreshToken
+    refreshToken,
+    refetchClaims,
   };
 
   return (

@@ -98,6 +98,12 @@ export function PublicNavbar() {
           {/* Botones de autenticación y menú móvil */}
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-2">
+              <Link
+                href="/registro-proveedor"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+              >
+                ¿Eres proveedor?
+              </Link>
               <Button variant="ghost" asChild>
                 <Link href="/login">Iniciar Sesión</Link>
               </Button>
@@ -142,6 +148,14 @@ export function PublicNavbar() {
                       <Button variant="outline" asChild>
                         <Link href="/login">Iniciar Sesión</Link>
                       </Button>
+                      <SheetClose asChild>
+                        <Link
+                          href="/registro-proveedor"
+                          className="text-center text-sm text-muted-foreground hover:text-foreground py-2 transition-colors"
+                        >
+                          ¿Eres proveedor? Regístrate aquí
+                        </Link>
+                      </SheetClose>
                     </div>
                   </div>
                 </div>

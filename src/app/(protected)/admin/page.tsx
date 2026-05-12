@@ -1,16 +1,87 @@
-import { DatabaseInitializer } from '@/components/admin/database-initializer';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { collection, query, where, getCountFromServer } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { FileText, Building2, Settings } from 'lucide-react';
+
+interface QuickLink {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  href: string;
+  badge?: number | null;
+}
+
+function QuickLinkCard({ icon: Icon, title, description, href, badge }: QuickLink) {
+  return (
+    <Link href={href}>
+      <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <Icon className="h-5 w-5 text-primary mt-0.5" />
+            {badge != null && badge > 0 && (
+              <Badge variant="destructive" className="text-xs">{badge}</Badge>
+            )}
+          </div>
+          <CardTitle className="text-base mt-2">{title}</CardTitle>
+          <CardDescription className="text-sm">{description}</CardDescription>
+        </CardHeader>
+      </Card>
+    </Link>
+  );
+}
 
 export default function AdminPage() {
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'solicitudes_proveedor'),
+      where('estado', '==', 'pendiente')
+    );
+    getCountFromServer(q)
+      .then((snap) => setPendingCount(snap.data().count))
+      .catch(() => setPendingCount(null));
+  }, []);
+
+  const links: QuickLink[] = [
+    {
+      icon: FileText,
+      title: 'Blog',
+      description: 'Crear y gestionar artículos del blog',
+      href: '/admin/blog',
+    },
+    {
+      icon: Building2,
+      title: 'Proveedores',
+      description: 'Aprobar y gestionar solicitudes de proveedores',
+      href: '/admin/proveedores',
+      badge: pendingCount,
+    },
+    {
+      icon: Settings,
+      title: 'Sistema',
+      description: 'Herramientas y configuraciones administrativas',
+      href: '/admin/sistema',
+    },
+  ];
+
   return (
     <div className="container max-w-4xl mx-auto p-4 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Panel de Administración</h1>
-        <p className="text-muted-foreground">
-          Herramientas y configuraciones administrativas
-        </p>
+        <p className="text-muted-foreground">Gestión y herramientas de STARLOGIC</p>
       </div>
 
-      <DatabaseInitializer />
+      <div className="grid sm:grid-cols-3 gap-4">
+        {links.map((link) => (
+          <QuickLinkCard key={link.href} {...link} />
+        ))}
+      </div>
     </div>
   );
 }

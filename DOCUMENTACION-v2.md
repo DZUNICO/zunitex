@@ -170,6 +170,51 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ## 📋 REGISTRO DE CAMBIOS
 
+### [2026-05-12] — Flujo completo de onboarding de proveedores
+
+**Funcionalidad implementada:**
+- Registro público de solicitudes de proveedor con formulario wizard de 2 pasos
+- Panel admin de aprobación con tabs Pendientes/Aprobados/Rechazados
+- Cloud Function `aprobarProveedor` que activa claims + Firestore + Supabase en un solo click
+- Admin page reemplazada por grid de accesos rápidos con badge de pendientes
+
+**Archivos creados:**
+- `src/lib/validations/registro-proveedor.ts` — schemas Zod + constantes CIUDADES, TIPOS_PROVEEDOR, PASO1_FIELDS
+- `src/app/(public)/registro-proveedor/layout.tsx` — metadata SEO (server component)
+- `src/app/(public)/registro-proveedor/page.tsx` — wizard 2 pasos: cuenta → empresa; createUserWithEmailAndPassword + dual Firestore write
+- `src/app/(protected)/admin/proveedores/page.tsx` — panel admin con Tabs, cards, Aprobar Dialog (slug editable), Rechazar Dialog
+- `functions/src/callable/aprobarProveedor.ts` — onCall: admin check → setCustomUserClaims → Firestore update → Supabase REST POST
+
+**Archivos modificados:**
+- `src/app/(protected)/admin/page.tsx` — reemplazado DatabaseInitializer por grid 3 cards (Blog, Proveedores+badge, Sistema)
+- `src/components/shared/public-navbar.tsx` — agregado link "¿Eres proveedor?" en desktop y mobile sheet
+- `functions/src/index.ts` — export de `aprobarProveedor`
+- `firestore.rules` — regla `solicitudes_proveedor`: create=owner, read+update=admin, delete=false
+
+**Variables de entorno requeridas en Cloud Functions:**
+- `SUPABASE_CATALOGO_URL` — URL del proyecto Supabase
+- `SUPABASE_CATALOGO_SERVICE_KEY` — service_role key (no anon key)
+
+**Flujo de aprobación:**
+1. Proveedor se registra en `/registro-proveedor` → crea cuenta Firebase Auth + doc `users/{uid}` + doc `solicitudes_proveedor/{uid}` (estado: 'pendiente')
+2. Admin ve solicitud en `/admin/proveedores`, edita slug/nombre/ciudad/descripcion/tipo
+3. Admin confirma → Cloud Function `aprobarProveedor` ejecuta:
+   - Verifica slug único en Supabase
+   - `setCustomUserClaims(uid, {role: 'verified_seller', admin: false})`
+   - `users/{uid}.role = 'verified_seller'`
+   - `solicitudes_proveedor/{uid}.estado = 'aprobado'`
+   - INSERT en Supabase `proveedores`
+4. Proveedor cierra sesión/reabre dropdown → claims actualizados → ve "Mi Portal" en navbar
+
+**Notas importantes:**
+- La ruta `/admin/sistema` aparece en el grid pero aún no existe — crear si se necesita o redirigir
+- El rechazar solicitud solo actualiza Firestore, NO revoca claims ni borra cuenta Auth
+- `aprobarProveedor` requiere deploy de Cloud Functions con las vars de entorno configuradas
+
+**Estado:** ✅ Completado (Cloud Functions pendientes de deploy + configurar vars de entorno)
+
+---
+
 ### [Mayo 2026] — Auditoría completa + simplificación de roles + catálogo CHINT
 
 **Cambios realizados:**
@@ -1314,6 +1359,73 @@ precio_ref_usd × 0.70 (descuento mínimo importador) × 3.60 (tipo de cambio fi
 - FK embedding no soportado sin FK registrado → se usan **dos queries separadas** en JS para proveedores
 - El campo `activo` en `proveedor_producto` se ignoró porque los datos no lo tienen seteado
 - Columna en `proveedores` es `web` (no `sitio_web`)
+
+---
+
+## 🏪 Dashboard de Proveedor
+
+**Disponible desde:** Mayo 2026  
+**Acceso:** `verified_seller` y `admin`  
+**Ruta:** `/proveedor` (grupo `(protected)`)
+
+### Archivos clave
+
+| Archivo | Descripción |
+|---------|-------------|
+| `src/lib/supabase/proveedor-client.ts` | Helpers Supabase: get, insert, update, delete de ofertas |
+| `src/app/(protected)/proveedor/page.tsx` | Dashboard principal con tabla editable |
+| `src/app/(protected)/proveedor/agregar/page.tsx` | Búsqueda + formulario para agregar ofertas |
+
+### Flujo de vinculación
+
+1. Admin crea registro en tabla `proveedores` de Supabase con `firebase_uid` = UID del usuario Firebase
+2. Al entrar a `/proveedor`, el dashboard consulta `proveedores` por `firebase_uid` para obtener el `proveedor_id`
+3. Con ese ID se cargan todas las filas de `proveedor_producto`
+
+### Schema proveedor_producto (campos usados)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id` | uuid | PK |
+| `proveedor_id` | uuid | FK → proveedores.id |
+| `producto_id` | uuid | FK → productos_catalogo.id |
+| `precio_pen` | numeric | Precio en soles (editable inline) |
+| `precio_minimo_pen` | numeric | Precio mínimo por volumen (editable inline) |
+| `precio_lista_usd` | numeric | Precio lista USD (opcional) |
+| `stock` | text | 'En stock' / 'A pedido' / 'Agotado' (select inline) |
+| `activo` | bool | Toggle visible en tabla |
+| `codigo_proveedor_origen` | text | Código interno del proveedor |
+
+### Funciones helper (`proveedor-client.ts`)
+
+```typescript
+getProveedorByFirebaseUid(uid)       // SELECT * FROM proveedores WHERE firebase_uid = uid
+getOfertasProveedor(proveedorId)     // Two-query: proveedor_producto + productos_catalogo merged
+getProductosOfrecidosMap(proveedorId) // Map<producto_id, precio_pen> para O(1) en catálogo
+insertOferta(data: OfertaInput)      // INSERT INTO proveedor_producto
+updateOferta(id, data)               // UPDATE por ID (para edición inline)
+deleteOferta(proveedorId, productoId) // DELETE por proveedor_id + producto_id
+```
+
+### Edición inline (dashboard)
+
+- Click en precio/stock → aparece `<Input>` o `<Select>` en la misma celda
+- `onBlur` o `Enter` → llama a `updateOferta` con optimistic update
+- `Escape` → cancela sin guardar
+- Toggle activo: click en badge → `updateOferta({ activo: !actual })` con optimistic update
+- Eliminar: AlertDialog de confirmación → `deleteOferta` con optimistic removal
+
+### Integración con catálogo (`/catalogo`)
+
+- Al entrar al catálogo con rol `verified_seller` o `admin`, se carga el `productosOfrecidosMap`
+- Cada `ProductoCard` recibe `canOfrecer` y `isOfrecido`
+- Si `isOfrecido`: badge verde "Ofreciendo"
+- Si no ofrecido: botón "Ofrecer" → `Link` a `/proveedor/agregar?q=[modelo]`
+
+### Acceso en navbar
+
+- El ítem "Mi Portal" (icono Building2) aparece en la barra de navegación solo para `verified_seller` y `admin`
+- Tanto en escritorio como en el sheet móvil
 
 ---
 

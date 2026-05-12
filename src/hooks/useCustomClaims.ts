@@ -13,37 +13,36 @@ export function useCustomClaims(user: User | null) {
   const [claims, setClaims] = useState<CustomClaims | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchClaims() {
-      if (!user) {
-        setClaims(null);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        // Forzar refresh del token para obtener claims actualizados
-        const tokenResult = await user.getIdTokenResult(true);
-        
-        // Conversión segura de claims
-        const customClaims: CustomClaims = {
-          role: (tokenResult.claims.role as UserRole) || 'user',
-          admin: tokenResult.claims.admin === true,
-        };
-        
-        setClaims(customClaims);
-      } catch (error) {
-        console.error('Error obteniendo custom claims:', error);
-        setClaims({ role: 'user', admin: false });
-      } finally {
-        setLoading(false);
-      }
+  async function fetchClaims(currentUser: User) {
+    try {
+      const tokenResult = await currentUser.getIdTokenResult(true);
+      setClaims({
+        role: (tokenResult.claims.role as UserRole) || 'user',
+        admin: tokenResult.claims.admin === true,
+      });
+    } catch (error) {
+      console.error('Error obteniendo custom claims:', error);
+      setClaims({ role: 'user', admin: false });
+    } finally {
+      setLoading(false);
     }
+  }
 
-    fetchClaims();
-  }, [user]);
+  useEffect(() => {
+    if (!user) {
+      setClaims(null);
+      setLoading(false);
+      return;
+    }
+    fetchClaims(user);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { claims, loading };
+  const refetchClaims = async () => {
+    if (!user) return;
+    await fetchClaims(user);
+  };
+
+  return { claims, loading, refetchClaims };
 }
 
 

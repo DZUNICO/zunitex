@@ -1,6 +1,6 @@
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
-import {logFunction, logError} from "../config";
+import {logFunction, logError} from "../config.js";
 
 /**
  * Cloud Function programada para realizar backups diarios de Firestore

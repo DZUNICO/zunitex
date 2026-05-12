@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Search, FileText, Zap, Plus, ChevronDown, X,
-  ExternalLink, Loader2, ArrowLeft,
+  ExternalLink, Loader2, ArrowLeft, CheckCircle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { catalogoClient } from '@/lib/supabase/catalogo-client';
+import { useAuth } from '@/lib/context/auth-context';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
+import {
+  getProveedorByFirebaseUid,
+  getProductosOfrecidosMap,
+} from '@/lib/supabase/proveedor-client';
 import type { AtributosTecnicos, ProductoCatalogo } from '@/types/catalogo';
 
 function getAtributoBadges(atributos: AtributosTecnicos): string[] {
@@ -59,6 +65,8 @@ interface CategoriaPreview {
 function CatalogoInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const { canOfferProducts } = useRolePermissions();
 
   const categoriaParam = searchParams.get('categoria') ?? 'all';
   const marcaParam     = searchParams.get('marca')     ?? 'all';
@@ -73,6 +81,16 @@ function CatalogoInner() {
   const [zoomUrl, setZoomUrl]       = useState<string | null>(null);
   const [categoriasPreview, setCategoriasPreview] = useState<CategoriaPreview[]>([]);
   const [showScrollTop, setShowScrollTop]         = useState(false);
+  const [ofrecidosMap, setOfrecidosMap] = useState<Map<string, number | null>>(new Map());
+
+  // ── Cargar mapa de productos ofrecidos (solo proveedor/admin) ─────────────
+  useEffect(() => {
+    if (!user?.uid || !canOfferProducts) return;
+    getProveedorByFirebaseUid(user.uid).then((prov) => {
+      if (!prov) return;
+      getProductosOfrecidosMap(prov.id).then(setOfrecidosMap);
+    });
+  }, [user?.uid, canOfferProducts]);
 
   // ── Helpers para actualizar URL ────────────────────────────────────────────
   const buildUrl = (cat: string, marc: string) => {
@@ -413,7 +431,14 @@ function CatalogoInner() {
       {!showSkeleton && !showCategoryView && !error && productos.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {productos.map((p) => (
-            <ProductoCard key={p.id} producto={p} onImageClick={setZoomUrl} onDetailsClick={saveScroll} />
+            <ProductoCard
+              key={p.id}
+              producto={p}
+              onImageClick={setZoomUrl}
+              onDetailsClick={saveScroll}
+              canOfrecer={canOfferProducts}
+              isOfrecido={ofrecidosMap.has(p.id)}
+            />
           ))}
         </div>
       )}
@@ -522,10 +547,14 @@ function ProductoCard({
   producto: p,
   onImageClick,
   onDetailsClick,
+  canOfrecer = false,
+  isOfrecido = false,
 }: {
   producto: ProductoCatalogo;
   onImageClick: (url: string) => void;
   onDetailsClick: () => void;
+  canOfrecer?: boolean;
+  isOfrecido?: boolean;
 }) {
   const atributoBadges = p.atributos ? getAtributoBadges(p.atributos) : [];
   const href = p.slug
@@ -714,6 +743,22 @@ function ProductoCard({
                 PDF
               </a>
             </Button>
+          )}
+
+          {canOfrecer && (
+            isOfrecido ? (
+              <div className="flex items-center gap-1 text-xs text-green-600">
+                <CheckCircle className="h-3 w-3" />
+                <span>Ofreciendo</span>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" className="text-xs h-7 px-2 gap-1" asChild>
+                <Link href={`/proveedor/agregar?q=${encodeURIComponent(p.modelo)}`}>
+                  <Plus className="h-3 w-3" />
+                  Ofrecer
+                </Link>
+              </Button>
+            )
           )}
 
           {href ? (

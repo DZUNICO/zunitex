@@ -25,6 +25,10 @@ const LEGACY_TO_NEW: Record<string, "profesional" | "proveedor"> = {
 
 const NEW_VALUES = new Set(["profesional", "proveedor"]);
 
+/**
+ * Migra userType legacy al nuevo esquema simplificado.
+ * @return {Promise<void>}
+ */
 export async function migrateUserTypes(): Promise<void> {
   const db = admin.firestore();
   const snapshot = await db.collection("users").get();
@@ -42,7 +46,8 @@ export async function migrateUserTypes(): Promise<void> {
   let totalSkipped = 0;
 
   for (const doc of snapshot.docs) {
-    const { userType, email } = doc.data() as { userType?: string; email?: string };
+    const data = doc.data() as {userType?: string; email?: string};
+    const {userType, email} = data;
 
     if (!userType || NEW_VALUES.has(userType)) {
       totalSkipped++;
@@ -51,12 +56,15 @@ export async function migrateUserTypes(): Promise<void> {
 
     const newType = LEGACY_TO_NEW[userType];
     if (!newType) {
-      console.warn(`⚠️  Valor desconocido '${userType}' en usuario ${doc.id} (${email ?? "sin email"}) — omitido`);
+      console.warn(
+        `⚠️  Valor desconocido '${userType}'` +
+        ` en usuario ${doc.id} (${email ?? "sin email"}) — omitido`
+      );
       totalSkipped++;
       continue;
     }
 
-    batch.update(doc.ref, { userType: newType });
+    batch.update(doc.ref, {userType: newType});
     console.log(`📝 ${doc.id} (${email ?? "?"})  ${userType} → ${newType}`);
     totalUpdated++;
     pendingInBatch++;
@@ -78,7 +86,10 @@ export async function migrateUserTypes(): Promise<void> {
     console.log(`✅ Batch final ${batchNum} OK`);
   }
 
-  console.log(`\n✅ Migración completada: ${totalUpdated} actualizados, ${totalSkipped} sin cambios`);
+  console.log(
+    `\n✅ Migración completada: ${totalUpdated} actualizados,` +
+    ` ${totalSkipped} sin cambios`
+  );
 }
 
 if (require.main === module) {

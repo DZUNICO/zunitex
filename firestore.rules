@@ -306,6 +306,18 @@ service cloud.firestore {
     }
     
     // ============================================================================
+    // SOLICITUDES PROVEEDOR
+    // ============================================================================
+    match /solicitudes_proveedor/{uid} {
+      // El propio usuario puede crear su solicitud
+      allow create: if isAuthenticated() && request.auth.uid == uid;
+      // Solo admins pueden leer y actualizar (aprobar/rechazar)
+      allow read, update: if isAdmin();
+      // Nunca se eliminan
+      allow delete: if false;
+    }
+
+    // ============================================================================
     // DEFAULT DENY
     // ============================================================================
     match /{document=**} {

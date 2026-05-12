@@ -32,6 +32,7 @@ export {
 // NUEVAS EXPORTACIONES - Custom Claims
 export {onUserCreate, onUserDocumentUpdate} from "./triggers/user-claims.js";
 export {refreshUserToken} from "./callable/refresh-token.js";
+export {aprobarProveedor} from "./callable/aprobarProveedor.js";
 
 console.log("🚀 Cloud Functions STARLOGIC iniciadas");
 

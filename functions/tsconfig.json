@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "ESNext",
+    "module": "Node16",
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "outDir": "lib",
@@ -19,7 +19,8 @@
   ],
   "exclude": [
     "node_modules",
-    "lib"
+    "lib",
+    "src/__tests__"
   ]
 }
 

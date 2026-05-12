@@ -29,7 +29,8 @@ import {
   FileText,
   Users,
   BookOpen,
-  Store
+  Store,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
@@ -61,8 +62,15 @@ const menuItems = [
   },
 ];
 
+const proveedorItem = {
+  icon: Building2,
+  label: 'Mi Portal',
+  href: '/proveedor',
+  description: 'Dashboard de proveedor',
+};
+
 export function Navbar() {
-  const { user, userRole, logout } = useAuth();
+  const { user, userRole, logout, refetchClaims } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -142,12 +150,15 @@ export function Navbar() {
             {menuItems.map((item) => (
               <MenuItem key={item.href} {...item} />
             ))}
+            {(userRole === 'verified_seller' || userRole === 'admin') && (
+              <MenuItem {...proveedorItem} />
+            )}
           </div>
 
           {/* Controles de usuario */}
           <div className="flex items-center space-x-2">
             {/* Menú de usuario */}
-            <DropdownMenu>
+            <DropdownMenu onOpenChange={(open) => { if (open) refetchClaims(); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
                   <User className="h-5 w-5" />
@@ -201,6 +212,11 @@ export function Navbar() {
                       <MenuItem {...item} mobile />
                     </SheetClose>
                   ))}
+                  {(userRole === 'verified_seller' || userRole === 'admin') && (
+                    <SheetClose asChild>
+                      <MenuItem {...proveedorItem} mobile />
+                    </SheetClose>
+                  )}
                   <SheetClose asChild>
                     <button
                       onClick={handleLogout}
