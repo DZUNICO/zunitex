@@ -6,12 +6,15 @@ export interface Proveedor {
   slug: string;
   firebase_uid: string | null;
   ciudad: string | null;
-  web: string | null;
   telefono: string | null;
-  logo_url: string | null;
-  descripcion: string | null;
-  region: string | null;
+  whatsapp: string | null;
   email: string | null;
+  web: string | null;
+  logo_url: string | null;
+  verified: boolean | null;
+  activo: boolean | null;
+  tipo: string | null;
+  descripcion: string | null;
 }
 
 export interface OfertaConProducto {
@@ -48,7 +51,7 @@ export interface OfertaInput {
 export async function getProveedorByFirebaseUid(uid: string): Promise<Proveedor | null> {
   const { data, error } = await catalogoClient
     .from('proveedores')
-    .select('id, nombre, slug, firebase_uid, ciudad, web, telefono, logo_url, descripcion, region, email')
+    .select('id, nombre, slug, ciudad, telefono, whatsapp, email, web, logo_url, verified, activo, firebase_uid, tipo, descripcion')
     .eq('firebase_uid', uid)
     .maybeSingle();
   if (error || !data) return null;
