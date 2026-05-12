@@ -48,6 +48,24 @@ import {
 
 const STOCK_OPTIONS = ['En stock', 'A pedido', 'Agotado'];
 
+const normalizar = (texto: string) =>
+  texto.toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .trim();
+
+function filtrarOfertas(ofertas: OfertaConProducto[], query: string): OfertaConProducto[] {
+  if (!query || query.trim().length < 2) return ofertas;
+  const tokens = normalizar(query).split(/\s+/).filter(Boolean);
+  return ofertas.filter((o) => {
+    const haystack = normalizar(
+      `${o.modelo} ${o.descripcion} ${o.categoria} ${o.codigo_fabricante ?? ''} ${o.marca}`
+    );
+    return tokens.every((t) => haystack.includes(t));
+  });
+}
+
 function getStockBadgeClass(stock: string | null) {
   if (stock === 'En stock') return 'bg-green-100 text-green-700';
   if (stock === 'Agotado') return 'bg-red-100 text-red-700';
@@ -410,15 +428,7 @@ export default function ProveedorDashboard() {
     })();
   }, [user?.uid, canOfferProducts]);
 
-  const filteredOfertas = search.trim()
-    ? ofertas.filter(
-        (o) =>
-          o.descripcion.toLowerCase().includes(search.toLowerCase()) ||
-          o.modelo.toLowerCase().includes(search.toLowerCase()) ||
-          o.marca.toLowerCase().includes(search.toLowerCase()) ||
-          o.categoria.toLowerCase().includes(search.toLowerCase())
-      )
-    : ofertas;
+  const filteredOfertas = filtrarOfertas(ofertas, search);
 
   const metrics = {
     total: ofertas.length,

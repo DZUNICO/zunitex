@@ -170,6 +170,27 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ## 📋 REGISTRO DE CAMBIOS
 
+### [2026-05-12] — Schemas BD en documentación + FTS en memoria portal proveedor
+
+**Cambios realizados:**
+
+- `DOCUMENTACION-v2.md` — Nueva sección `## 🗄️ Schemas de Base de Datos — Referencia Obligatoria` con schemas completos de Firestore (`users`, `solicitudes_proveedor`) y Supabase (`proveedores`, `productos_catalogo`, `proveedor_producto`). Incluye columnas que NO existen (ej: `region` en `proveedores`) para evitar errores 400.
+- `src/app/(protected)/proveedor/page.tsx` — Reemplazado filtro simple `.ilike()` en memoria por `filtrarOfertas()` con normalización Unicode (tildes, símbolos, case) y lógica AND por tokens. Busca en `modelo + descripcion + categoria + codigo_fabricante + marca`. Cero requests adicionales a Supabase.
+
+**Ejemplos de búsqueda habilitados:**
+- `"nxm 125"` → encuentra NXM-125S/3300
+- `"termomagnetico 32"` → todos los termomagnéticos 32A
+- `"814009"` → por código de fabricante
+- `"llave fuerza 3p"` → llaves de fuerza 3 polos
+
+**Archivos modificados:**
+- `DOCUMENTACION-v2.md`
+- `src/app/(protected)/proveedor/page.tsx`
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-12] — Limpieza de debug logs, UID dinámico en scripts, select específico Supabase
 
 **Problema resuelto:**
@@ -1347,6 +1368,152 @@ firebase deploy --only storage
 
 1. Verificar `remotePatterns` en next.config.ts
 2. Verificar `allow read: if true` en rules
+
+---
+
+## 🗄️ Schemas de Base de Datos — Referencia Obligatoria
+
+> **CONSULTAR ESTA SECCIÓN** antes de cualquier `.select()`, `.insert()`, `.update()` o definición de interfaz TypeScript. Nunca asumir columnas — verificar siempre aquí.
+
+---
+
+### Firebase Firestore — Colección `users/{uid}`
+
+| Campo | Tipo |
+|---|---|
+| `uid` | string |
+| `email` | string |
+| `displayName` | string |
+| `photoURL` | string \| null |
+| `phone` | string (opcional) |
+| `location` | string (opcional) |
+| `about` | string (opcional) |
+| `role` | `'admin'` \| `'verified_seller'` \| `'user'` |
+| `userType` | `'profesional'` \| `'proveedor'` |
+| `verificationStatus` | null \| string |
+| `active` | boolean |
+| `specialties` | string[] |
+| `followersCount` | number |
+| `followingCount` | number |
+| `projectsCount` | number |
+| `rating` | number |
+| `reviewsCount` | number |
+| `resourcesCount` | number |
+| `createdAt` | timestamp |
+| `lastLogin` | timestamp |
+
+---
+
+### Firebase Firestore — Colección `solicitudes_proveedor/{uid}`
+
+| Campo | Tipo |
+|---|---|
+| `uid` | string |
+| `email` | string |
+| `nombreEmpresa` | string |
+| `ruc` | string |
+| `ciudad` | string |
+| `telefono` | string |
+| `web` | string \| null |
+| `descripcion` | string |
+| `tipoProveedor` | string |
+| `estado` | `'pendiente'` \| `'aprobado'` \| `'rechazado'` |
+| `motivoRechazo` | string (opcional) |
+| `createdAt` | timestamp |
+
+---
+
+### Supabase — Tabla `proveedores`
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid | PK |
+| `created_at` | timestamptz | |
+| `nombre` | text | |
+| `slug` | text | unique |
+| `tipo` | text | |
+| `descripcion` | text | |
+| `ciudad` | text | |
+| `telefono` | text | |
+| `whatsapp` | text | |
+| `email` | text | |
+| `web` | text | |
+| `logo_url` | text | |
+| `verified` | boolean | |
+| `activo` | boolean | |
+| `firebase_uid` | text | FK lógica → Auth UID |
+
+> ⚠️ Columnas que **NO existen**: `region`. Usar el select definido en `proveedor-client.ts`.
+
+---
+
+### Supabase — Tabla `productos_catalogo`
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid | PK |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+| `marca` | text | |
+| `modelo` | text | |
+| `descripcion` | text | |
+| `categoria` | text | |
+| `slug` | text | unique |
+| `nombres_alternativos` | text[] | |
+| `atributos` | jsonb | |
+| `normas` | text[] | |
+| `precio_ref_usd` | numeric | |
+| `precio_ref_pen` | numeric | |
+| `precio_updated_at` | date | |
+| `disponible_peru` | boolean | |
+| `ficha_tecnica_pdf` | text | |
+| `manual_pdf` | text | |
+| `pagina_oficial` | text | |
+| `imagen_url` | text | |
+| `url_starlogic` | text | |
+| `meta_title` | text | |
+| `meta_description` | text | |
+| `search_vector` | tsvector | generado automáticamente |
+| `codigo_fabricante` | text | |
+
+> Select recomendado para el catálogo (no incluir columnas SEO/meta en listados):
+> `id, codigo_fabricante, marca, modelo, descripcion, categoria, slug, atributos, precio_ref_usd, imagen_url, ficha_tecnica_pdf, disponible_peru`
+
+---
+
+### Supabase — Tabla `proveedor_producto`
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid | PK |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+| `proveedor_id` | uuid | FK → proveedores.id |
+| `producto_id` | uuid | FK → productos_catalogo.id |
+| `codigo_proveedor` | text | |
+| `precio_pen` | numeric | |
+| `precio_usd` | numeric | |
+| `moneda_base` | text | |
+| `stock` | text | |
+| `tiempo_entrega` | text | |
+| `notas` | text | |
+| `activo` | boolean | |
+| `precio_minimo_pen` | numeric | |
+| `precio_lista_usd` | numeric | |
+| `precio_lista_pen` | numeric | |
+| `descuento_pct` | numeric | |
+| `codigo_proveedor_origen` | text | |
+
+> ⚠️ **Columnas que NO existen en esta tabla**: `precio_ref_usd` (está en `productos_catalogo`).
+
+---
+
+### REGLA CRÍTICA — Antes de cualquier query a Supabase
+
+1. Verificar que **todas** las columnas del `.select()` existen en el schema de esta sección
+2. **Nunca asumir** columnas — siempre consultar aquí antes de codificar
+3. Si se agrega una columna nueva a la BD, **actualizar este schema** en este archivo
+4. Las interfaces TypeScript deben coincidir exactamente con las columnas seleccionadas
 
 ---
 
