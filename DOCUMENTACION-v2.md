@@ -170,6 +170,50 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ## 📋 REGISTRO DE CAMBIOS
 
+### [2026-05-12] — Limpieza de debug logs, UID dinámico en scripts, select específico Supabase
+
+**Problema resuelto:**
+- Console.logs de debug expuestos en producción (UIDs, flujo de pasos internos)
+- UID de administrador hardcodeado en script de claims
+- `select('*')` en queries de Supabase transfiriendo columnas innecesarias (~40-60% de payload extra)
+
+**Cambios realizados:**
+
+- `src/app/(public)/registro-proveedor/page.tsx` — Eliminados logs Paso 1/2/3, debug de error y rollback; catch del rollback silenciado
+- `src/app/(public)/catalogo/page.tsx` — Eliminado log `[prov] error`; todas las queries de `productos_catalogo` cambiadas de `select('*')` a 12 columnas específicas via constante `PRODUCTO_SELECT`
+- `src/components/shared/admin-route.tsx` — Eliminado `console.log('AdminRoute debug:', ...)`
+- `functions/src/scripts/setAdminClaim.ts` — UID hardcodeado reemplazado por `process.argv[2]` con validación
+- `.gitignore` — Agregados scripts de admin/migración (`setAdminClaim.ts`, `setProviderClaim.ts`, `migrateUsers.ts`)
+- `src/types/catalogo.ts` — Eliminados campos nunca renderizados (`familia`, `uso`, `fases`, `normas`, `pagina_oficial`, `manual_pdf`); agregado `disponible_peru`
+- `src/lib/supabase/proveedor-client.ts` — `getProveedorByFirebaseUid` y `getOfertasProveedor` con selects específicos (no más `select('*')`)
+- `src/app/(protected)/proveedor/agregar/page.tsx` — Queries de búsqueda con campos específicos
+- `src/app/(public)/catalogo/[marca]/[slug]/page.tsx` — Todas las queries con campos específicos
+
+**Archivos modificados:**
+- `src/app/(public)/registro-proveedor/page.tsx`
+- `src/app/(public)/catalogo/page.tsx`
+- `src/app/(public)/catalogo/[marca]/[slug]/page.tsx`
+- `src/components/shared/admin-route.tsx`
+- `src/lib/supabase/proveedor-client.ts`
+- `src/app/(protected)/proveedor/agregar/page.tsx`
+- `src/types/catalogo.ts`
+- `functions/src/scripts/setAdminClaim.ts`
+- `.gitignore`
+
+**Testing realizado:**
+- ✅ TypeScript compila sin errores de tipo (campos en type coinciden con campos seleccionados)
+- ✅ `precio_ref_pen` mantenido en tipo y en select del detalle (usado en página `/catalogo/[marca]/[slug]`)
+- ✅ Scripts de admin ejecutables via `npx ts-node setAdminClaim.ts <UID>`
+
+**Notas importantes:**
+- Los scripts (`setAdminClaim.ts`, etc.) ya están commiteados en git — para eliminarlos del historial hay que ejecutar `git rm --cached functions/src/scripts/setAdminClaim.ts` manualmente
+- El gitignore aplica solo a futuros archivos no trackeados
+- `PRODUCTO_SELECT` es una constante local en cada archivo; si se necesita compartir entre más componentes, extraer a `src/lib/supabase/catalogo-client.ts`
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-12] — Flujo completo de onboarding de proveedores
 
 **Funcionalidad implementada:**

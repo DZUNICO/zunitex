@@ -56,6 +56,10 @@ function processSearchQuery(rawQuery: string): string {
   }).join(' & ');
 }
 
+const PRODUCTO_SELECT =
+  'id, codigo_fabricante, marca, modelo, descripcion, categoria, slug, ' +
+  'atributos, precio_ref_usd, imagen_url, ficha_tecnica_pdf, disponible_peru';
+
 interface CategoriaPreview {
   categoria: string;
   imagen_url: string | null;
@@ -200,7 +204,7 @@ function CatalogoInner() {
 
         if (trimmed.length < 2) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let q: any = catalogoClient.from('productos_catalogo').select('*')
+          let q: any = catalogoClient.from('productos_catalogo').select(PRODUCTO_SELECT)
             .eq('disponible_peru', true);
           if (categoriaParam !== 'all') q = q.eq('categoria', categoriaParam);
           if (marcaParam !== 'all')     q = q.eq('marca', marcaParam);
@@ -222,7 +226,7 @@ function CatalogoInner() {
         // Capa 0 — código de fabricante exacto
         if (/^\d{5,8}$/.test(trimmed)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: dataCod } = await (catalogoClient.from('productos_catalogo').select('*') as any)
+          const { data: dataCod } = await (catalogoClient.from('productos_catalogo').select(PRODUCTO_SELECT) as any)
             .eq('codigo_fabricante', trimmed)
             .eq('disponible_peru', true)
             .limit(10);
@@ -235,7 +239,7 @@ function CatalogoInner() {
         // Capa 1 — FTS
         const ftsQuery = processSearchQuery(trimmed);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let q1: any = catalogoClient.from('productos_catalogo').select('*')
+        let q1: any = catalogoClient.from('productos_catalogo').select(PRODUCTO_SELECT)
           .textSearch('search_vector', ftsQuery, { type: 'plain', config: 'spanish' });
         q1 = applyFilters(q1);
         const { data: data1, error: err1 } = await q1.order('marca');
@@ -244,7 +248,7 @@ function CatalogoInner() {
         // Capa 2 — ILIKE por token
         const tokens = normalizeText(trimmed).split(' ').filter(Boolean);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let q2: any = catalogoClient.from('productos_catalogo').select('*');
+        let q2: any = catalogoClient.from('productos_catalogo').select(PRODUCTO_SELECT);
         for (const token of tokens) {
           q2 = q2.or(`descripcion.ilike.%${token}%,modelo.ilike.%${token}%,marca.ilike.%${token}%`);
         }
@@ -254,7 +258,7 @@ function CatalogoInner() {
 
         // Capa 3 — ILIKE full query
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let q3: any = catalogoClient.from('productos_catalogo').select('*')
+        let q3: any = catalogoClient.from('productos_catalogo').select(PRODUCTO_SELECT)
           .or(`descripcion.ilike.%${trimmed}%,modelo.ilike.%${trimmed}%,marca.ilike.%${trimmed}%`);
         q3 = applyFilters(q3);
         const { data: data3, error: err3 } = await q3.order('marca');
@@ -601,8 +605,7 @@ function ProductoCard({
           }))
           .filter((row: any) => row.proveedores !== null)
       );
-    } catch (e) {
-      console.error('[prov] error:', e);
+    } catch {
       setProveedores([]);
     } finally {
       setLoadingProv(false);

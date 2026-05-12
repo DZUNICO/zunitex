@@ -48,22 +48,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPersistence(auth, browserLocalPersistence);
 
     // Listener de cambios de autenticación
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
-      
+      setLoading(false); // No bloquear en la escritura de Firestore
+
       if (user) {
-        // Actualizar lastLogin en Firestore (error no-crítico)
-        try {
-          await updateDoc(doc(db, 'users', user.uid), {
-            lastLogin: serverTimestamp()
-          });
-        } catch (error) {
-          // Error no-crítico, solo logear warning
-          console.warn('No se pudo actualizar lastLogin:', error);
-        }
+        // Fire-and-forget: actualizar lastLogin (no-crítico, no bloquea el estado)
+        setDoc(doc(db, 'users', user.uid), {
+          lastLogin: serverTimestamp()
+        }, { merge: true }).catch(() => {
+          // Silencioso: falla esperada para usuarios nuevos cuyo doc aún no existe
+        });
       }
-      
-      setLoading(false);
     });
 
     return unsubscribe;
@@ -142,11 +138,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // true mientras el user existe pero sus claims aún no se fetched
+  // evita el gap de timing: auth loading=false, claimsLoading=false, claims=null
+  const claimsStale = !!user && claims === null;
+
   const value = {
     user,
     userRole: claims?.role || null,
     isAdmin: claims?.admin || false,
-    loading: loading || claimsLoading,
+    loading: loading || claimsLoading || claimsStale,
     signUp,
     signIn,
     logout,

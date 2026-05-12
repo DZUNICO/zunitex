@@ -75,38 +75,43 @@ service cloud.firestore {
       // Lectura: Cualquier usuario autenticado
       allow read: if isAuthenticated();
       
-      // Creación: Solo cuando el usuario se registra (auth.uid == userId)
+      // Creación: registro completo O setDoc merge de lastLogin (onAuthStateChanged)
       allow create: if isOwner(userId) &&
-                      request.resource.data.role == 'user' &&
-                      request.resource.data.userType in ['profesional', 'proveedor'];
+                      (
+                        (
+                          request.resource.data.role == 'user' &&
+                          request.resource.data.userType in ['profesional', 'proveedor']
+                        )
+                        ||
+                        request.resource.data.keys().hasOnly(['lastLogin'])
+                      );
       
       // Actualización: Propio usuario o admin
       allow update: if (isOwner(userId) || isAdmin()) &&
-
                       (
                         // Solo lastLogin: sin restricciones adicionales
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin'])
                         ||
-                        // Admin: puede actualizar cualquier campo de cualquier usuario
-                        // (no necesita pasar los chequeos de campo de usuario regular)
+                        // Admin: puede actualizar cualquier campo
                         isAdmin()
+                        ||
+                        // Completar registro cuando onAuthStateChanged creó el doc
+                        // antes de que el formulario terminarara (doc tiene solo lastLogin)
+                        (
+                          isOwner(userId) &&
+                          !('role' in resource.data) &&
+                          request.resource.data.role == 'user' &&
+                          request.resource.data.userType in ['profesional', 'proveedor']
+                        )
                         ||
                         // Usuario regular: campos protegidos no pueden modificarse
                         (
                           request.resource.data.uid == resource.data.uid &&
-
                           request.resource.data.email == resource.data.email &&
-
                           request.resource.data.createdAt == resource.data.createdAt &&
-
-                          // Role solo puede ser cambiado por admin (ya cubierto arriba)
                           request.resource.data.role == resource.data.role &&
-
-                          // Contadores no se pueden modificar manualmente
                           request.resource.data.followersCount == resource.data.followersCount &&
-
                           request.resource.data.followingCount == resource.data.followingCount &&
-
                           request.resource.data.projectsCount == resource.data.projectsCount
                         )
                       );
@@ -310,10 +315,11 @@ service cloud.firestore {
     // ============================================================================
     match /solicitudes_proveedor/{uid} {
       // El propio usuario puede crear su solicitud
-      allow create: if isAuthenticated() && request.auth.uid == uid;
-      // Solo admins pueden leer y actualizar (aprobar/rechazar)
-      allow read, update: if isAdmin();
-      // Nunca se eliminan
+      allow create: if request.auth != null
+                      && request.auth.uid == uid;
+      // Solo admin puede leer y actualizar (aprobar/rechazar)
+      allow read, update: if request.auth != null
+                             && request.auth.token.admin == true;
       allow delete: if false;
     }
 

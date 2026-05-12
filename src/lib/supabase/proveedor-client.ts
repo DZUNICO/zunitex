@@ -48,7 +48,7 @@ export interface OfertaInput {
 export async function getProveedorByFirebaseUid(uid: string): Promise<Proveedor | null> {
   const { data, error } = await catalogoClient
     .from('proveedores')
-    .select('*')
+    .select('id, nombre, slug, firebase_uid, ciudad, web, telefono, logo_url, descripcion, region, email')
     .eq('firebase_uid', uid)
     .maybeSingle();
   if (error || !data) return null;
@@ -59,7 +59,7 @@ export async function getProveedorByFirebaseUid(uid: string): Promise<Proveedor 
 export async function getOfertasProveedor(proveedorId: string): Promise<OfertaConProducto[]> {
   const { data: ppRows, error: err1 } = await catalogoClient
     .from('proveedor_producto')
-    .select('*')
+    .select('id, proveedor_id, producto_id, precio_pen, precio_minimo_pen, precio_lista_usd, stock, activo, codigo_proveedor_origen')
     .eq('proveedor_id', proveedorId);
   if (err1 || !ppRows || ppRows.length === 0) return [];
 

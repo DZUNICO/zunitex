@@ -54,7 +54,12 @@ firebase-debug.log
 .env.sentry-build-plugin
 
 .vercel
-serviceAccountKey.json 
+serviceAccountKey.json
+
+# Admin/migration scripts (operaciones sensibles — ejecutar manualmente)
+functions/src/scripts/setAdminClaim.ts
+functions/src/scripts/setProviderClaim.ts
+functions/src/scripts/migrateUsers.ts
 
 # Claude Code local settings
 .claude/settings.local.json

@@ -16,17 +16,12 @@ export interface ProductoCatalogo {
   modelo: string;
   descripcion: string;
   categoria: string;
-  familia?: string | null;
-  uso?: string | null;
-  fases?: string | null;
-  normas?: string | null;
-  precio_ref_pen?: number | null;
-  precio_ref_usd?: number | null;
   codigo_fabricante?: string | null;
-  atributos?: AtributosTecnicos | null;
-  ficha_tecnica_pdf?: string | null;
-  pagina_oficial?: string | null;
-  manual_pdf?: string | null;
-  imagen_url?: string | null;
   slug?: string | null;
+  atributos?: AtributosTecnicos | null;
+  precio_ref_usd?: number | null;
+  precio_ref_pen?: number | null; // usado en página de detalle
+  imagen_url?: string | null;
+  ficha_tecnica_pdf?: string | null;
+  disponible_peru?: boolean | null;
 }

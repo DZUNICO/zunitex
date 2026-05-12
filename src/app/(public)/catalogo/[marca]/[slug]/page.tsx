@@ -79,7 +79,7 @@ export default function ProductoDetailPage() {
 
     catalogoClient
       .from('productos_catalogo')
-      .select('*')
+      .select('id, codigo_fabricante, marca, modelo, descripcion, categoria, slug, atributos, precio_ref_usd, precio_ref_pen, imagen_url, ficha_tecnica_pdf')
       .eq('slug', slug)
       .ilike('marca', marca)
       .maybeSingle()
@@ -96,7 +96,7 @@ export default function ProductoDetailPage() {
     (async () => {
       const { data: pp, error: ppError } = await catalogoClient
         .from('proveedor_producto')
-        .select('*')
+        .select('precio, disponibilidad, url_producto, proveedor_id')
         .eq('producto_id', producto.id);
 
       if (ppError || !pp || pp.length === 0) {
@@ -109,7 +109,7 @@ export default function ProductoDetailPage() {
 
       const { data: provs } = await catalogoClient
         .from('proveedores')
-        .select('*')
+        .select('id, nombre, slug, ciudad, logo_url, telefono, sitio_web')
         .in('id', ids);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

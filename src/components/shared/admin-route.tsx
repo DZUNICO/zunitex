@@ -12,18 +12,19 @@ interface AdminRouteProps {
 }
 
 export function AdminRoute({ children }: AdminRouteProps) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, userRole, loading } = useAuth();
   const router = useRouter();
+  const hasAdminAccess = isAdmin || userRole === 'admin';
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         router.push('/login');
-      } else if (!isAdmin) {
+      } else if (!hasAdminAccess) {
         router.push('/');
       }
     }
-  }, [user, isAdmin, loading, router]);
+  }, [user, hasAdminAccess, loading, router]);
 
   if (loading) {
     return (
@@ -33,7 +34,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!user || !hasAdminAccess) {
     return null;
   }
 

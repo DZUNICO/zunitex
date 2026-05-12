@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase/config';
 import {
@@ -84,12 +84,15 @@ export default function RegistroProveedorPage() {
 
   const onSubmit = async (data: RegistroProveedorInput) => {
     setSubmitting(true);
+    let userCredential = null;
     try {
-      const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      const { uid } = cred.user;
+      // Paso 1: crear cuenta Auth
+      userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const { uid } = userCredential.user;
 
-      await updateProfile(cred.user, { displayName: data.nombreEmpresa });
+      await updateProfile(userCredential.user, { displayName: data.nombreEmpresa });
 
+      // Paso 2: crear documento users/{uid}
       await setDoc(doc(db, 'users', uid), {
         uid,
         email: data.email,
@@ -107,8 +110,9 @@ export default function RegistroProveedorPage() {
         rating: 0,
         reviewsCount: 0,
         resourcesCount: 0,
-      });
+      }, { merge: true });
 
+      // Paso 3: crear solicitud
       await setDoc(doc(db, 'solicitudes_proveedor', uid), {
         uid,
         email: data.email,
@@ -125,6 +129,16 @@ export default function RegistroProveedorPage() {
 
       setSuccess(true);
     } catch (err: unknown) {
+      // Rollback: si Auth se creó pero algo falló después, revertir
+      if (userCredential?.user) {
+        try {
+          await deleteDoc(doc(db, 'users', userCredential.user.uid)).catch(() => {});
+          await userCredential.user.delete();
+        } catch {
+          // rollback silencioso
+        }
+      }
+
       const code = (err as { code?: string }).code;
       const message =
         code === 'auth/email-already-in-use'

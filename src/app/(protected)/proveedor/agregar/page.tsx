@@ -104,9 +104,12 @@ function AgregarInner() {
       setLoadingSearch(true);
       try {
         const ftsQuery = processSearchQuery(search.trim());
+        const PRODUCTO_SELECT =
+          'id, codigo_fabricante, marca, modelo, descripcion, categoria, slug, ' +
+          'atributos, precio_ref_usd, imagen_url, ficha_tecnica_pdf, disponible_peru';
         const { data, error } = await catalogoClient
           .from('productos_catalogo')
-          .select('*')
+          .select(PRODUCTO_SELECT)
           .textSearch('search_vector', ftsQuery, { type: 'plain', config: 'spanish' })
           .eq('disponible_peru', true)
           .order('marca')
@@ -117,7 +120,7 @@ function AgregarInner() {
         } else {
           const { data: d2 } = await catalogoClient
             .from('productos_catalogo')
-            .select('*')
+            .select(PRODUCTO_SELECT)
             .or(`descripcion.ilike.%${search.trim()}%,modelo.ilike.%${search.trim()}%`)
             .eq('disponible_peru', true)
             .order('marca')

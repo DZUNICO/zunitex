@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/lib/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Zap, Search, Menu } from 'lucide-react';
@@ -42,6 +43,7 @@ const menuItems = [
 export function PublicNavbar() {
   const [searchQuery, setSearchQuery] = useState('');
   const pathname = usePathname();
+  const { user } = useAuth();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,12 +100,14 @@ export function PublicNavbar() {
           {/* Botones de autenticación y menú móvil */}
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-2">
-              <Link
-                href="/registro-proveedor"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
-              >
-                ¿Eres proveedor?
-              </Link>
+              {!user && (
+                <Link
+                  href="/registro-proveedor"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                >
+                  ¿Eres proveedor?
+                </Link>
+              )}
               <Button variant="ghost" asChild>
                 <Link href="/login">Iniciar Sesión</Link>
               </Button>
@@ -148,14 +152,16 @@ export function PublicNavbar() {
                       <Button variant="outline" asChild>
                         <Link href="/login">Iniciar Sesión</Link>
                       </Button>
-                      <SheetClose asChild>
-                        <Link
-                          href="/registro-proveedor"
-                          className="text-center text-sm text-muted-foreground hover:text-foreground py-2 transition-colors"
-                        >
-                          ¿Eres proveedor? Regístrate aquí
-                        </Link>
-                      </SheetClose>
+                      {!user && (
+                        <SheetClose asChild>
+                          <Link
+                            href="/registro-proveedor"
+                            className="text-center text-sm text-muted-foreground hover:text-foreground py-2 transition-colors"
+                          >
+                            ¿Eres proveedor? Regístrate aquí
+                          </Link>
+                        </SheetClose>
+                      )}
                     </div>
                   </div>
                 </div>
