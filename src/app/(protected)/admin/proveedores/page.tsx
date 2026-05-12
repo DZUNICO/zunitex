@@ -224,7 +224,12 @@ export default function AdminProveedoresPage() {
         telefono: aprobarTarget.telefono,
         web: aprobarTarget.web,
       });
-      toast({ title: 'Proveedor aprobado', description: `${aprobarForm.nombreEmpresa} ahora tiene acceso verificado.` });
+      // El proveedor debe refrescar su JWT para que los nuevos claims (verified_seller)
+      // sean visibles — esto ocurre al cerrar sesión y volver a entrar.
+      toast({
+        title: 'Proveedor aprobado',
+        description: `${aprobarForm.nombreEmpresa} aprobado. El proveedor debe cerrar sesión y volver a entrar para ver su portal.`,
+      });
       setAprobarTarget(null);
     } catch (err: unknown) {
       toast({

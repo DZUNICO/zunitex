@@ -170,6 +170,31 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ## 📋 REGISTRO DE CAMBIOS
 
+### [2026-05-12] — Paginación comunidad verificada, error boundaries, types, image sizes
+
+**Cambios realizados:**
+
+- `src/app/(public)/catalogo/page.tsx` — MEJORA 2: atributo `sizes` en 3 imágenes (categorías 60px, card 80px/96px responsive, logo proveedor 24px). MEJORA 5: reemplazados 4 `any` por tipos explícitos (`{ categoria, marca }[]`, `{ categoria, imagen_url }[]`, `PpRow`, `ProvRow`) + type guard en `.filter()`.
+- `src/app/(public)/catalogo/[marca]/[slug]/page.tsx` — MEJORA 2: `sizes` en imagen principal `(max-width: 768px) 100vw, 600px` y logo proveedor `48px`.
+- `src/app/(public)/catalogo/layout.tsx` — MEJORA 4: nuevo layout con `ErrorBoundary` scope="section" para toda la ruta `/catalogo`.
+- `src/app/(protected)/admin/proveedores/page.tsx` — MEJORA 3: toast de aprobación actualizado con instrucción de re-login para el proveedor + comentario explicativo en código.
+
+**MEJORA 1 — Paginación comunidad:** Ya implementada. `useCommunityPosts` usa `useInfiniteQuery` con `limit: 10` por página, `maxPages: 10` (cap de 100 items) y cursor `startAfter`. Sin cambios necesarios.
+
+**Build:** ✅ `npm run build` exitoso — 24 rutas generadas, sin errores TypeScript.
+
+**Archivos modificados:**
+- `src/app/(public)/catalogo/page.tsx`
+- `src/app/(public)/catalogo/[marca]/[slug]/page.tsx`
+- `src/app/(protected)/admin/proveedores/page.tsx`
+
+**Archivos creados:**
+- `src/app/(public)/catalogo/layout.tsx`
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-12] — Schemas BD en documentación + FTS en memoria portal proveedor
 
 **Cambios realizados:**

@@ -159,6 +159,7 @@ export default function ProductoDetailPage() {
             src={producto.imagen_url}
             alt={producto.modelo}
             className="w-full h-full object-contain"
+            sizes="(max-width: 768px) 100vw, 600px"
           />
         ) : (
           <Zap className="h-16 w-16 text-muted-foreground/20" />
@@ -280,7 +281,7 @@ export default function ProductoDetailPage() {
                   {/* Logo o inicial */}
                   <div className="flex-shrink-0">
                     {p.logo_url ? (
-                      <img src={p.logo_url} alt={p.nombre} className="w-12 h-12 rounded-md object-contain" />
+                      <img src={p.logo_url} alt={p.nombre} className="w-12 h-12 rounded-md object-contain" sizes="48px" />
                     ) : (
                       <div className="w-12 h-12 rounded-md bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
                         {p.nombre.charAt(0).toUpperCase()}

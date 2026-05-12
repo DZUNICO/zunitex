@@ -174,16 +174,14 @@ function CatalogoInner() {
         .order('id', { ascending: true }),
     ]).then(([{ data: filterData }, { data: imgData }]) => {
       if (filterData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rows = filterData as any[];
+        const rows = filterData as { categoria: string; marca: string }[];
         setCategorias([...new Set(rows.map((d) => d.categoria).filter(Boolean))].sort() as string[]);
         setMarcas([...new Set(rows.map((d) => d.marca).filter(Boolean))].sort() as string[]);
       }
       if (imgData) {
         const seen = new Set<string>();
         const preview: CategoriaPreview[] = [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const row of imgData as any[]) {
+        for (const row of imgData as { categoria: string; imagen_url: string | null }[]) {
           if (row.categoria && !seen.has(row.categoria)) {
             seen.add(row.categoria);
             preview.push({ categoria: row.categoria, imagen_url: row.imagen_url });
@@ -358,6 +356,7 @@ function CatalogoInner() {
                       className="w-full h-full object-contain"
                       loading="lazy"
                       decoding="async"
+                      sizes="60px"
                     />
                   ) : (
                     <Zap className="h-6 w-6 text-muted-foreground/25" />
@@ -583,8 +582,10 @@ function ProductoCard({
 
       if (err1 || !pp || pp.length === 0) { setProveedores([]); return; }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ids = (pp as any[]).map((r: any) => r.proveedor_id).filter(Boolean);
+      type PpRow = { proveedor_id: string; precio_pen: number | null; precio_minimo_pen: number | null; stock: string | null };
+      type ProvRow = { id: string; nombre: string; slug: string; ciudad: string | null; logo_url: string | null; telefono: string | null; web: string | null };
+      const ppRows = pp as PpRow[];
+      const ids = ppRows.map((r) => r.proveedor_id).filter(Boolean);
       const { data: provs } = await catalogoClient
         .from('proveedores')
         .select('id, nombre, slug, ciudad, logo_url, telefono, web')
@@ -592,18 +593,17 @@ function ProductoCard({
 
       if (!provs) { setProveedores([]); return; }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const provRows = provs as ProvRow[];
       setProveedores(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (pp as any[])
-          .map((row: any) => ({
+        ppRows
+          .map((row) => ({
             proveedor_id: row.proveedor_id,
             precio:       row.precio_pen ?? row.precio_minimo_pen ?? null,
             url_producto: null,
             stock:        row.stock ?? null,
-            proveedores:  provs.find((pv: any) => pv.id === row.proveedor_id) ?? null,
+            proveedores:  provRows.find((pv) => pv.id === row.proveedor_id) ?? null,
           }))
-          .filter((row: any) => row.proveedores !== null)
+          .filter((row): row is ProveedorRow => row.proveedores !== null)
       );
     } catch {
       setProveedores([]);
@@ -633,6 +633,7 @@ function ProductoCard({
                 className="w-full h-full object-contain"
                 loading="lazy"
                 decoding="async"
+                sizes="(max-width: 640px) 80px, (max-width: 1024px) 96px, 96px"
               />
             ) : (
               <Zap className="h-7 w-7 text-muted-foreground/25" />
@@ -699,7 +700,7 @@ function ProductoCard({
                   return (
                     <li key={i} className="flex items-center gap-2">
                       {pv?.logo_url ? (
-                        <img src={pv.logo_url} alt={pv.nombre} className="w-6 h-6 rounded object-contain flex-shrink-0" loading="lazy" decoding="async" />
+                        <img src={pv.logo_url} alt={pv.nombre} className="w-6 h-6 rounded object-contain flex-shrink-0" loading="lazy" decoding="async" sizes="24px" />
                       ) : (
                         <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {pv?.nombre?.charAt(0) ?? '?'}
