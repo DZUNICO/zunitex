@@ -29,22 +29,12 @@ import { db } from "@/lib/firebase/config";
 import { useAuth } from "@/lib/context/auth-context";
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/react-query/keys';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const profileSchema = z.object({
   displayName: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   location: z.string().min(2, "La ubicación debe tener al menos 2 caracteres"),
   about: z.string().optional(),
   specialties: z.string().transform(str => str.split(',').map(s => s.trim())),
-  userType: z.enum(['profesional', 'proveedor'], {
-    required_error: "Por favor selecciona tu tipo"
-  })
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -74,7 +64,6 @@ export function ProfileEditDialog({
       location: profile.location || '',
       about: profile.about || '',
       specialties: profile.specialties?.join(', ') || '',
-      userType: (profile.userType === 'proveedor' ? 'proveedor' : 'profesional'),
     },
   });
 
@@ -90,7 +79,6 @@ export function ProfileEditDialog({
         location: data.location,
         about: data.about,
         specialties: data.specialties,
-        userType: data.userType,
         updatedAt: serverTimestamp()
       });
 
@@ -108,7 +96,6 @@ export function ProfileEditDialog({
       onUpdate({
         ...profile,
         ...data,
-        userType: data.userType,  // Asegurar que userType se pase explícitamente
       });
 
       toast({
@@ -168,27 +155,6 @@ export function ProfileEditDialog({
                 </FormItem>
               )}
             />
-            <FormField
-                control={form.control}
-                name="userType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Soy</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-11">
-                          <SelectValue placeholder="Selecciona tu tipo" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="profesional">Profesional</SelectItem>
-                        <SelectItem value="proveedor">Proveedor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             <FormField
               control={form.control}
               name="about"

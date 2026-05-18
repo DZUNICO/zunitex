@@ -66,14 +66,6 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
     });
   };
 
-  const getUserTypeLabel = (userType: string): string => {
-    const labels: Record<string, string> = {
-      profesional: 'Profesional',
-      proveedor:   'Proveedor',
-    };
-    return labels[userType] ?? '';
-  };
-
   const isFounder = currentProfile.email === ADMIN_EMAIL;
 
   return (
@@ -124,15 +116,11 @@ export function ProfileHeader({ profile, isOwnProfile = true, userId }: ProfileH
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
               <h1 className="text-2xl font-bold">
                 {currentProfile.displayName}
-                {isFounder ? (
+                {isFounder && (
                   <span className="ml-2 text-sm font-semibold tracking-widest text-amber-600 dark:text-amber-400">
                     FUNDADOR
                   </span>
-                ) : currentProfile.userType ? (
-                  <span className="text-lg font-normal text-muted-foreground ml-2">
-                    ({getUserTypeLabel(currentProfile.userType)})
-                  </span>
-                ) : null}
+                )}
               </h1>
               <div className="flex items-center justify-center md:justify-start gap-2">
                 <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />

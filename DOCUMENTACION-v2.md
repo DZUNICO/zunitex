@@ -195,6 +195,33 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ---
 
+### [2026-05-18] — Eliminar userType editable por usuario
+
+**Problema resuelto:**
+- El campo "Soy" (Profesional/Proveedor) en el formulario de editar perfil permitía al usuario cambiar su `userType` manualmente, cuando este campo debe ser asignado exclusivamente por el sistema.
+
+**Cambios realizados:**
+
+- `src/components/profile/profile-edit-dialog.tsx` — Eliminado FormField "Soy" (Select con opciones Profesional/Proveedor), eliminado `userType` del schema Zod, de `defaultValues`, del `updateDoc`, del `onUpdate`. Eliminado import de `Select/SelectContent/SelectItem/SelectTrigger/SelectValue`.
+- `src/components/profile/profile-header.tsx` — Eliminada función `getUserTypeLabel()` y el span `({getUserTypeLabel(currentProfile.userType)})` que mostraba el tipo junto al nombre del usuario.
+
+**Archivos auditados y sin cambios (razón):**
+- `registro-proveedor/page.tsx` — `userType: 'proveedor'` es asignación automática del sistema. ✅ Correcto.
+- `auth-context.tsx` — `userType: DEFAULT_USER_TYPE` ('profesional') al registrarse. ✅ Correcto.
+- `register/page.tsx`, `RegisterForm` — Sin `userType`. ✅ Sin cambio.
+- `solicitar-proveedor/page.tsx` — Sin `userType`. ✅ Sin cambio.
+- `useRolePermissions.ts` — Solo usa `userRole`, sin dependencia de `userType`. ✅ Sin cambio.
+- `types/roles.ts`, `types/index.ts`, `types/profile.ts` — Solo definiciones de tipo. ✅ Sin cambio.
+
+**Regla de asignación de userType (sistema, no usuario):**
+- Registro normal → `userType: 'profesional'` (asignado por `auth-context.tsx`)
+- Registro proveedor → `userType: 'proveedor'` (asignado por `registro-proveedor/page.tsx`)
+- Upgrade user→proveedor → `userType` sigue siendo 'profesional' hasta aprobación — la CF `aprobarProveedor` lo actualiza si corresponde
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-18] — Flujo upgrade User → Proveedor sin nueva cuenta
 
 **Cambios realizados:**
@@ -1129,9 +1156,11 @@ export type UserType = 'profesional' | 'proveedor';
 
 ### Reglas
 
-- Al registrarse: `role = 'user'`, `userType = 'profesional'` (default)
-- Para ser `verified_seller`: el admin asigna el role manualmente via Cloud Function `updateCustomClaims`
+- Al registrarse: `role = 'user'`, `userType = 'profesional'` (default, asignado automáticamente)
+- Al registrar como proveedor (`/registro-proveedor`): `userType = 'proveedor'` (asignado automáticamente)
+- Para ser `verified_seller`: el admin asigna el role manualmente via Cloud Function `aprobarProveedor`
 - El `firebase_uid` del proveedor se vincula en la tabla `proveedores` de Supabase
+- ⚠️ **`userType` NO debe ser editable por el usuario** — eliminado del formulario de editar perfil (2026-05-18)
 
 ### Custom Claims (Firebase Auth)
 
@@ -1435,7 +1464,7 @@ firebase deploy --only storage
 | `location` | string (opcional) |
 | `about` | string (opcional) |
 | `role` | `'admin'` \| `'verified_seller'` \| `'user'` |
-| `userType` | `'profesional'` \| `'proveedor'` |
+| `userType` | `'profesional'` \| `'proveedor'` — **NO editable por el usuario; asignado por el sistema** |
 | `verificationStatus` | null \| string |
 | `active` | boolean |
 | `specialties` | string[] |
