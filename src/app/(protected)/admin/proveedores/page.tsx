@@ -52,6 +52,7 @@ interface Solicitud {
   tipoProveedor: string;
   estado: 'pendiente' | 'aprobado' | 'rechazado';
   motivoRechazo?: string;
+  origen?: string;
   createdAt: { seconds: number } | null;
 }
 
@@ -132,6 +133,11 @@ function SolicitudCard({
         </div>
         <div className="flex items-center gap-2 pt-1">
           <Badge variant="secondary" className="text-xs">{s.tipoProveedor}</Badge>
+          {s.origen === 'upgrade' && (
+            <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400">
+              Upgrade
+            </Badge>
+          )}
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2">{s.descripcion}</p>
 

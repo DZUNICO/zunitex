@@ -195,6 +195,26 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ---
 
+### [2026-05-18] — Flujo upgrade User → Proveedor sin nueva cuenta
+
+**Cambios realizados:**
+
+- `src/components/shared/public-navbar.tsx` — Botón "¿Eres proveedor?" ahora ruta a `/solicitar-proveedor` si el usuario está autenticado con `role: 'user'`; oculto para `verified_seller` y `admin`.
+- `src/app/(protected)/solicitar-proveedor/page.tsx` — Nueva página protegida. Redirige a `/proveedor` si ya es `verified_seller`; muestra pantalla de espera si hay solicitud pendiente; muestra formulario con `paso2Schema`. Escribe `solicitudes_proveedor/{uid}` con `origen: 'upgrade'`.
+- `src/app/(protected)/admin/proveedores/page.tsx` — Interfaz `Solicitud` agrega `origen?: string`; badge "Upgrade" en azul en las cards donde `origen === 'upgrade'`.
+- `DOCUMENTACION-v2.md` — Agrega campo `origen` al schema de `solicitudes_proveedor`.
+
+**Flujo completo upgrade:**
+1. Usuario con `role: 'user'` ve "¿Eres proveedor?" → `/solicitar-proveedor`
+2. Completa formulario → `solicitudes_proveedor/{uid}` con `origen: 'upgrade'`
+3. Admin ve solicitud con badge "Upgrade" en `/admin/proveedores`
+4. Admin aprueba → `aprobarProveedor` CF ejecuta `setCustomUserClaims` en UID existente
+5. Usuario cierra sesión y vuelve a entrar → `role: 'verified_seller'` → acceso a `/proveedor`
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-12] — Schemas BD en documentación + FTS en memoria portal proveedor
 
 **Cambios realizados:**
@@ -1444,6 +1464,7 @@ firebase deploy --only storage
 | `tipoProveedor` | string |
 | `estado` | `'pendiente'` \| `'aprobado'` \| `'rechazado'` |
 | `motivoRechazo` | string (opcional) |
+| `origen` | `'upgrade'` \| omitido (registro nuevo) |
 | `createdAt` | timestamp |
 
 ---

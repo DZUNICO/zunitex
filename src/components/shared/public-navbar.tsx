@@ -43,11 +43,10 @@ const menuItems = [
 export function PublicNavbar() {
   const [searchQuery, setSearchQuery] = useState('');
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Búsqueda:', searchQuery);
   };
 
   return (
@@ -100,9 +99,9 @@ export function PublicNavbar() {
           {/* Botones de autenticación y menú móvil */}
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-2">
-              {!user && (
+              {(!user || userRole === 'user') && (
                 <Link
-                  href="/registro-proveedor"
+                  href={!user ? '/registro-proveedor' : '/solicitar-proveedor'}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
                 >
                   ¿Eres proveedor?
@@ -152,10 +151,10 @@ export function PublicNavbar() {
                       <Button variant="outline" asChild>
                         <Link href="/login">Iniciar Sesión</Link>
                       </Button>
-                      {!user && (
+                      {(!user || userRole === 'user') && (
                         <SheetClose asChild>
                           <Link
-                            href="/registro-proveedor"
+                            href={!user ? '/registro-proveedor' : '/solicitar-proveedor'}
                             className="text-center text-sm text-muted-foreground hover:text-foreground py-2 transition-colors"
                           >
                             ¿Eres proveedor? Regístrate aquí
