@@ -199,7 +199,8 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 **Cambios realizados:**
 
-- `src/components/shared/public-navbar.tsx` — Botón "¿Eres proveedor?" ahora ruta a `/solicitar-proveedor` si el usuario está autenticado con `role: 'user'`; oculto para `verified_seller` y `admin`.
+- `src/components/shared/public-navbar.tsx` — Botón "¿Eres proveedor?" ahora ruta a `/solicitar-proveedor` si el usuario está autenticado con `role: 'user'`; oculto para `verified_seller` y `admin`. ⚠️ Solo aplica a usuarios NO autenticados (esta navbar no se muestra a usuarios con sesión).
+- `src/components/shared/protected-navbar.tsx` — Botón "¿Eres proveedor?" agregado en desktop (entre nav items y perfil) y en Sheet mobile (antes de Cerrar Sesión). Visible solo cuando `role === 'user'`; oculto para `verified_seller` y `admin`.
 - `src/app/(protected)/solicitar-proveedor/page.tsx` — Nueva página protegida. Redirige a `/proveedor` si ya es `verified_seller`; muestra pantalla de espera si hay solicitud pendiente; muestra formulario con `paso2Schema`. Escribe `solicitudes_proveedor/{uid}` con `origen: 'upgrade'`.
 - `src/app/(protected)/admin/proveedores/page.tsx` — Interfaz `Solicitud` agrega `origen?: string`; badge "Upgrade" en azul en las cards donde `origen === 'upgrade'`.
 - `DOCUMENTACION-v2.md` — Agrega campo `origen` al schema de `solicitudes_proveedor`.

@@ -153,6 +153,14 @@ export function Navbar() {
             {(userRole === 'verified_seller' || userRole === 'admin') && (
               <MenuItem {...proveedorItem} />
             )}
+            {userRole === 'user' && (
+              <Link
+                href="/solicitar-proveedor"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+              >
+                ¿Eres proveedor?
+              </Link>
+            )}
           </div>
 
           {/* Controles de usuario */}
@@ -215,6 +223,16 @@ export function Navbar() {
                   {(userRole === 'verified_seller' || userRole === 'admin') && (
                     <SheetClose asChild>
                       <MenuItem {...proveedorItem} mobile />
+                    </SheetClose>
+                  )}
+                  {userRole === 'user' && (
+                    <SheetClose asChild>
+                      <Link
+                        href="/solicitar-proveedor"
+                        className="text-center text-sm text-muted-foreground hover:text-foreground py-2 transition-colors px-3"
+                      >
+                        ¿Eres proveedor? Regístrate aquí
+                      </Link>
                     </SheetClose>
                   )}
                   <SheetClose asChild>
