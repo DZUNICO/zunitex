@@ -195,32 +195,61 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ---
 
-### [2026-05-19] — Fix admin token refresh + verificación claims en aprobarProveedor
+### [2026-05-19] — Fix aprobarProveedor: firma onCall v1 + imports admin-sdk + token refresh
 
 **Problema resuelto:**
 - CF `aprobarProveedor` retornaba 403 "Solo administradores pueden aprobar proveedores" aunque el usuario tenía `{ role: 'admin', admin: true }` en custom claims.
-- `aprobarProveedor.ts` incluía `region: data.ciudad` en el INSERT de Supabase, pero la columna `region` no existe en la tabla `proveedores` — causaría error 400 en paso 5.
 
-**Causa raíz (403):**
-`auth-context.tsx` → `onAuthStateChanged` llamaba `setUser(user)` SIN hacer `getIdToken(true)` primero. El token cacheado podía ser anterior a la asignación de custom claims via Admin SDK. Aunque `useCustomClaims` hace `getIdTokenResult(true)` después, hay una ventana de timing y posibles fallos silenciosos. El callable `httpsCallable` usa el token cacheado al momento de la llamada — si el refresh aún no completó, el token no tiene `admin: true`.
+**Causas raíz (múltiples):**
+
+1. **Firma incorrecta de CF v1:** `onCall(async (request) => {...})` — En CF v1, la firma correcta es `(data, context)`. Con `(request)`, `request.auth` era siempre `undefined` → la condición `undefined?.token?.admin !== true` evaluaba a `true` → siempre 403.
+
+2. **Import namespace incompatible con ESM:** `import * as admin from "firebase-admin"` con `admin.auth()` y `admin.firestore()` no funciona en módulos ESM (`"type": "module"` en `functions/package.json`). Da error runtime "admin.auth is not a function".
+
+3. **Token stale en auth-context:** `onAuthStateChanged` llamaba `setUser(user)` SIN hacer `getIdToken(true)` primero. El token cacheado podía ser anterior a los custom claims del Admin SDK.
 
 **Cambios realizados:**
 
-- `src/lib/context/auth-context.tsx` — Callback de `onAuthStateChanged` cambiado a async. Se agrega `await user.getIdToken(true)` ANTES de `setUser(user)`. Garantiza que el token cacheado siempre tiene los últimos custom claims antes de que cualquier componente acceda al estado de auth.
-- `functions/src/callable/aprobarProveedor.ts` — Eliminado `region: data.ciudad` del body del INSERT en Supabase (columna inexistente, causaría error 400 en paso 5 tras resolver el 403).
-- `functions/lib/callable/aprobarProveedor.js` — Recompilado con `npm --prefix functions run build`.
+- `functions/src/callable/aprobarProveedor.ts`:
+  - Firma: `(request)` → `(data, context)`
+  - `request.auth` → `context.auth`; `request.data.*` → `typedData.*`
+  - `import * as admin from "firebase-admin"` → `import {auth, db} from "../config.js"` + `import {FieldValue} from "firebase-admin/firestore"`
+  - `admin.auth().setCustomUserClaims(...)` → `auth.setCustomUserClaims(...)`
+  - `admin.firestore().doc(...).update(...)` → `db.doc(...).update(...)`
+  - `admin.firestore.FieldValue.serverTimestamp()` → `FieldValue.serverTimestamp()`
+  - Eliminado `region: data.ciudad` del INSERT (columna inexistente en tabla `proveedores`)
+- `src/lib/context/auth-context.tsx` — Callback `onAuthStateChanged` cambiado a async; `await user.getIdToken(true)` ANTES de `setUser(user)`.
 
-**Verificación CF (condición admin):**
-```typescript
-// aprobarProveedor.ts línea 25 — CORRECTA, no se modifica
-if (request.auth?.token?.admin !== true) {
-  throw new HttpsError("permission-denied", "Solo administradores pueden aprobar proveedores");
-}
+**Variables de entorno de CF (functions/.env — NO commitear):**
 ```
+SUPABASE_CATALOGO_URL=https://<proyecto>.supabase.co
+SUPABASE_CATALOGO_SERVICE_KEY=<service_role_key>
+```
+⚠️ `functions/.env` y `functions/.env.local` están en `.gitignore`. Verificado en líneas 45-46.
+La CF las lee vía `process.env.SUPABASE_CATALOGO_URL` y `process.env.SUPABASE_CATALOGO_SERVICE_KEY`.
 
-**⚠️ DEPLOY REQUERIDO:** `firebase deploy --only functions:aprobarProveedor`
+**Deploy realizado:** `firebase deploy --only functions:aprobarProveedor` ✅
 
-**Estado:** ✅ Código listo — pendiente deploy de Cloud Function
+**Estado:** ✅ Completado y deployado
+
+---
+
+### [2026-05-19] — Auditoría TypeScript + fixes src/
+
+**Problema resuelto:**
+- 3 errores TypeScript en archivos `src/` que impedirían builds estrictos.
+
+**Cambios realizados:**
+
+- `src/app/(public)/catalogo/page.tsx` línea 606 — Reemplazado type predicate `.filter((row): row is ProveedorRow => ...)` por `.filter((row) => ...) as ProveedorRow[]`. Causa: `ProveedorRow.proveedores` es opcional (`?`) pero el tipo inferido del map no incluye `undefined`, haciendo el predicate no asignable (TS2677).
+- `src/app/(public)/catalogo/page.tsx` línea 602 — `url_producto: null` → `null as string | null`. Causa: tipo literal `null` no era asignable a `string | null` en el type predicate (relacionado con el fix anterior).
+- `src/app/(protected)/proveedor/agregar/page.tsx` líneas 119 y 128 — `data as ProductoCatalogo[]` → `data as unknown as ProductoCatalogo[]`. Causa: Supabase infiere `GenericStringError[]` cuando el select es una constante string; doble cast via `unknown` es el patrón correcto.
+
+**Testing realizado:**
+- ✅ `npx tsc --noEmit` — 0 errores en `src/`
+- ✅ `npm run build` — 26 rutas generadas, 0 errores
+
+**Estado:** ✅ Completado
 
 ---
 

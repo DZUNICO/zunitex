@@ -116,7 +116,7 @@ function AgregarInner() {
           .limit(24);
 
         if (!error && data && data.length > 0) {
-          setProductos(data as ProductoCatalogo[]);
+          setProductos(data as unknown as ProductoCatalogo[]);
         } else {
           const { data: d2 } = await catalogoClient
             .from('productos_catalogo')
@@ -125,7 +125,7 @@ function AgregarInner() {
             .eq('disponible_peru', true)
             .order('marca')
             .limit(24);
-          setProductos((d2 as ProductoCatalogo[]) ?? []);
+          setProductos((d2 as unknown as ProductoCatalogo[]) ?? []);
         }
       } finally {
         setLoadingSearch(false);

@@ -599,11 +599,11 @@ function ProductoCard({
           .map((row) => ({
             proveedor_id: row.proveedor_id,
             precio:       row.precio_pen ?? row.precio_minimo_pen ?? null,
-            url_producto: null,
+            url_producto: null as string | null,
             stock:        row.stock ?? null,
             proveedores:  provRows.find((pv) => pv.id === row.proveedor_id) ?? null,
           }))
-          .filter((row): row is ProveedorRow => row.proveedores !== null)
+          .filter((row) => row.proveedores !== null) as ProveedorRow[]
       );
     } catch {
       setProveedores([]);
