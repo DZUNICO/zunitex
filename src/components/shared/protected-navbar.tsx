@@ -31,6 +31,7 @@ import {
   BookOpen,
   Store,
   Building2,
+  LayoutDashboard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
@@ -67,6 +68,13 @@ const proveedorItem = {
   label: 'Mi Portal',
   href: '/proveedor',
   description: 'Dashboard de proveedor',
+};
+
+const adminItem = {
+  icon: LayoutDashboard,
+  label: 'Admin',
+  href: '/admin',
+  description: 'Panel de administración',
 };
 
 export function Navbar() {
@@ -139,12 +147,6 @@ export function Navbar() {
               STARLOGIC
             </span>
           </Link>
-          {userRole === 'admin' && (
-            <Link href="/admin" className="...">
-              Admin
-            </Link>
-          )}
-
           {/* Navegación principal - escritorio */}
           <div className="hidden md:flex items-center space-x-1">
             {menuItems.map((item) => (
@@ -152,6 +154,9 @@ export function Navbar() {
             ))}
             {userRole === 'verified_seller' && (
               <MenuItem {...proveedorItem} />
+            )}
+            {userRole === 'admin' && (
+              <MenuItem {...adminItem} />
             )}
             {userRole === 'user' && (
               <Link
@@ -223,6 +228,11 @@ export function Navbar() {
                   {userRole === 'verified_seller' && (
                     <SheetClose asChild>
                       <MenuItem {...proveedorItem} mobile />
+                    </SheetClose>
+                  )}
+                  {userRole === 'admin' && (
+                    <SheetClose asChild>
+                      <MenuItem {...adminItem} mobile />
                     </SheetClose>
                   )}
                   {userRole === 'user' && (
