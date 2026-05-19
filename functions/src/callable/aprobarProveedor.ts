@@ -20,18 +20,19 @@ const SUPABASE_URL = process.env.SUPABASE_CATALOGO_URL ?? "";
 const SUPABASE_SERVICE_KEY =
   process.env.SUPABASE_CATALOGO_SERVICE_KEY ?? "";
 
-export const aprobarProveedor = functions.https.onCall(async (request) => {
+// eslint-disable-next-line max-len
+export const aprobarProveedor = functions.https.onCall(async (data, context) => {
   // Solo admins pueden aprobar
-  if (request.auth?.token?.admin !== true) {
+  if (context.auth?.token?.admin !== true) {
     throw new functions.https.HttpsError(
       "permission-denied",
       "Solo administradores pueden aprobar proveedores"
     );
   }
 
-  const data = request.data as AprobarData;
+  const typedData = data as AprobarData;
 
-  if (!data.uid || !data.slug || !data.nombreEmpresa) {
+  if (!typedData.uid || !typedData.slug || !typedData.nombreEmpresa) {
     throw new functions.https.HttpsError(
       "invalid-argument",
       "Faltan campos requeridos: uid, slug, nombreEmpresa"
@@ -41,7 +42,7 @@ export const aprobarProveedor = functions.https.onCall(async (request) => {
   // 1. Verificar unicidad del slug en Supabase
   const checkUrl =
     `${SUPABASE_URL}/rest/v1/proveedores` +
-    `?slug=eq.${encodeURIComponent(data.slug)}&select=id`;
+    `?slug=eq.${encodeURIComponent(typedData.slug)}&select=id`;
   const checkRes = await fetch(checkUrl, {
     headers: {
       apikey: SUPABASE_SERVICE_KEY,
@@ -60,18 +61,18 @@ export const aprobarProveedor = functions.https.onCall(async (request) => {
   if (existing.length > 0) {
     throw new functions.https.HttpsError(
       "already-exists",
-      `El slug '${data.slug}' ya está en uso. Elige otro.`
+      `El slug '${typedData.slug}' ya está en uso. Elige otro.`
     );
   }
 
   // 2. Asignar custom claim verified_seller
-  await admin.auth().setCustomUserClaims(data.uid, {
+  await admin.auth().setCustomUserClaims(typedData.uid, {
     role: "verified_seller",
     admin: false,
   });
 
   // 3. Actualizar users/{uid} en Firestore
-  await admin.firestore().doc(`users/${data.uid}`).update({
+  await admin.firestore().doc(`users/${typedData.uid}`).update({
     role: "verified_seller",
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
@@ -79,7 +80,7 @@ export const aprobarProveedor = functions.https.onCall(async (request) => {
   // 4. Actualizar solicitudes_proveedor/{uid} a aprobado
   await admin
     .firestore()
-    .doc(`solicitudes_proveedor/${data.uid}`)
+    .doc(`solicitudes_proveedor/${typedData.uid}`)
     .update({
       estado: "aprobado",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -95,14 +96,14 @@ export const aprobarProveedor = functions.https.onCall(async (request) => {
       "Prefer": "return=minimal",
     },
     body: JSON.stringify({
-      nombre: data.nombreEmpresa,
-      slug: data.slug,
-      firebase_uid: data.uid,
-      email: data.email,
-      ciudad: data.ciudad,
-      descripcion: data.descripcion,
-      telefono: data.telefono,
-      web: data.web ?? null,
+      nombre: typedData.nombreEmpresa,
+      slug: typedData.slug,
+      firebase_uid: typedData.uid,
+      email: typedData.email,
+      ciudad: typedData.ciudad,
+      descripcion: typedData.descripcion,
+      telefono: typedData.telefono,
+      web: typedData.web ?? null,
     }),
   });
 
@@ -115,7 +116,8 @@ export const aprobarProveedor = functions.https.onCall(async (request) => {
     );
   }
 
-  console.log(`Proveedor aprobado: ${data.uid} (${data.nombreEmpresa})`);
+  // eslint-disable-next-line max-len
+  console.log(`Proveedor aprobado: ${typedData.uid} (${typedData.nombreEmpresa})`);
 
   return {success: true};
 });
