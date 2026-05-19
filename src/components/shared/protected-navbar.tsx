@@ -140,7 +140,7 @@ export function Navbar() {
             </span>
           </Link>
           {userRole === 'admin' && (
-            <Link href="/admin/blog" className="...">
+            <Link href="/admin" className="...">
               Admin
             </Link>
           )}

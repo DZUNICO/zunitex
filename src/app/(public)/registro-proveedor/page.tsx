@@ -61,6 +61,7 @@ export default function RegistroProveedorPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState('');
   const { toast } = useToast();
 
   const {
@@ -127,6 +128,7 @@ export default function RegistroProveedorPage() {
         createdAt: serverTimestamp(),
       });
 
+      setSubmittedEmail(data.email);
       setSuccess(true);
     } catch (err: unknown) {
       // Rollback: si Auth se creó pero algo falló después, revertir
@@ -162,11 +164,12 @@ export default function RegistroProveedorPage() {
             </div>
             <h1 className="text-2xl font-bold mb-2">¡Solicitud enviada!</h1>
             <p className="text-muted-foreground mb-6">
-              Te contactaremos en <strong>24-48 horas</strong> para verificar tu cuenta y
-              activar tu acceso al catálogo.
+              Hemos recibido tu solicitud. El equipo de STARLOGIC la revisará en las
+              próximas <strong>24-48 horas</strong> y te contactaremos a{' '}
+              <strong>{submittedEmail}</strong> con el resultado.
             </p>
-            <Button asChild className="w-full">
-              <Link href="/catalogo">Explorar catálogo</Link>
+            <Button variant="outline" asChild className="w-full">
+              <Link href="/catalogo">Ir al catálogo</Link>
             </Button>
           </CardContent>
         </Card>

@@ -57,8 +57,8 @@ export default function AdminPage() {
     },
     {
       icon: Building2,
-      title: 'Proveedores',
-      description: 'Aprobar y gestionar solicitudes de proveedores',
+      title: 'Solicitudes de Proveedores',
+      description: 'Aprobar o rechazar solicitudes pendientes',
       href: '/admin/proveedores',
       badge: pendingCount,
     },

@@ -11,11 +11,12 @@ export default function PublicLayout({
 }) {
   const { user, loading } = useAuth();
 
-  if (loading) return null;
-
   return (
     <>
-      {user ? <Navbar /> : <PublicNavbar />}
+      {/* Navbar se oculta durante el check inicial de auth para evitar flash.
+          Children se renderizan siempre para no perder estado de formularios
+          mientras Firebase resuelve custom claims (claimsStale). */}
+      {!loading && (user ? <Navbar /> : <PublicNavbar />)}
       {children}
     </>
   );

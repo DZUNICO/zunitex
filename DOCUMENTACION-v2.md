@@ -195,6 +195,29 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ---
 
+### [2026-05-19] — Fix confirmación post-registro proveedor + acceso admin a solicitudes
+
+**Problema resuelto:**
+1. Usuario completaba wizard `/registro-proveedor` y era redirigido silenciosamente sin ver la pantalla de confirmación.
+2. Admin debía navegar manualmente a `/admin/proveedores`; no había acceso visible desde la navbar.
+
+**Causa raíz Bug 1:**
+`auth-context.tsx` expone `loading = loading || claimsLoading || claimsStale`. Al crear cuenta en Paso 1, Firebase autentica al usuario inmediatamente. `claimsStale = !!user && claims === null` se vuelve `true` mientras se fetching los custom claims. El `(public)/layout.tsx` ejecutaba `if (loading) return null` → desmontaba toda la página → se perdía el estado `success: true` → el formulario se volvía a renderizar con `success: false`.
+
+**Cambios realizados:**
+
+- `src/app/(public)/layout.tsx` — Eliminado `if (loading) return null`. Reemplazado por `{!loading && (user ? <Navbar /> : <PublicNavbar />)}`. Children siempre se renderizan; solo la navbar se oculta durante el check inicial de auth. Esto preserva el estado del formulario cuando `claimsStale` causa un ciclo de loading.
+- `src/app/(public)/registro-proveedor/page.tsx` — Agregado `submittedEmail` state. En submit exitoso: `setSubmittedEmail(data.email)`. Pantalla de confirmación actualizada: mensaje incluye email del usuario, botón cambiado a "Ir al catálogo".
+- `src/components/shared/protected-navbar.tsx` — Link "Admin" cambiado de `/admin/blog` → `/admin` (dashboard con badge de solicitudes pendientes).
+- `src/app/(protected)/admin/page.tsx` — Título card "Proveedores" → "Solicitudes de Proveedores"; descripción actualizada a "Aprobar o rechazar solicitudes pendientes".
+
+**Opción elegida para acceso admin:**
+Link navbar → `/admin` (no `/admin/proveedores`) porque el dashboard admin ya tiene la card con badge rojo de solicitudes pendientes vía `getCountFromServer`. Un solo click lleva al admin a ver el conteo y navegar a proveedores. Es más completo que enlazar directo a proveedores.
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-18] — Eliminar userType editable por usuario
 
 **Problema resuelto:**
