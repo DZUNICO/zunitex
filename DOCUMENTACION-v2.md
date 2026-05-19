@@ -195,6 +195,34 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ---
 
+### [2026-05-19] — Fix proveedores en detalle producto + codigo_fabricante visible
+
+**Problemas resueltos:**
+1. Página `/catalogo/[marca]/[slug]` mostraba "Aún no hay proveedores listados" aunque sí existen en BD.
+2. `codigo_fabricante` no aparecía en la UI a pesar de estar en el SELECT.
+
+**Causa raíz Bug 1 — columnas incorrectas en queries:**
+- `proveedor_producto` select tenía `disponibilidad` (no existe → PostgREST devuelve error 400) y `precio` (no existe, columna real es `precio_pen`). Error 400 → `ppError` seteado → `setProveedores([])` → mensaje vacío.
+- `proveedores` select tenía `sitio_web` (no existe, columna real es `web`). Documentado en DOCUMENTACION-v2.md: "Columna en proveedores es web (no sitio_web)".
+
+**Causa raíz Bug 2:** `codigo_fabricante` estaba en el SELECT pero no había JSX que lo renderizara.
+
+**Cambios realizados en `src/app/(public)/catalogo/[marca]/[slug]/page.tsx`:**
+- `proveedor_producto` select: `precio, disponibilidad` → `precio_pen, stock`
+- `proveedores` select: `sitio_web` → `web`
+- Interface `ProveedorProducto`: `disponibilidad: string | null` → `stock: string | null`; `sitio_web: string | null` → `web: string | null`
+- Map: `row.precio` → `row.precio_pen`; `row.disponibilidad` → `row.stock`; campo renombrado en objeto
+- Badge disponibilidad: `pp.disponibilidad` → `pp.stock`
+- `tiendaHref`: `p.sitio_web` → `p.web`
+- Encabezado producto: agregado `{producto.codigo_fabricante && <p className="text-xs font-mono">Cód: {codigo_fabricante}</p>}` bajo el modelo
+
+**Testing realizado:**
+- ✅ `npm run build` — 26 rutas, 0 errores
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-19] — Separación de roles: admin nunca ve Mi Portal
 
 **Problema resuelto:**

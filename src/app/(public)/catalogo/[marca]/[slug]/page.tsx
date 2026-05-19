@@ -11,7 +11,7 @@ import type { ProductoCatalogo } from '@/types/catalogo';
 
 interface ProveedorProducto {
   precio: number | null;
-  disponibilidad: string | null;
+  stock: string | null;
   url_producto: string | null;
   proveedores: {
     nombre: string;
@@ -19,7 +19,7 @@ interface ProveedorProducto {
     ciudad: string | null;
     logo_url: string | null;
     telefono: string | null;
-    sitio_web: string | null;
+    web: string | null;
   } | null;
 }
 
@@ -96,7 +96,7 @@ export default function ProductoDetailPage() {
     (async () => {
       const { data: pp, error: ppError } = await catalogoClient
         .from('proveedor_producto')
-        .select('precio, disponibilidad, url_producto, proveedor_id')
+        .select('precio_pen, stock, url_producto, proveedor_id')
         .eq('producto_id', producto.id);
 
       if (ppError || !pp || pp.length === 0) {
@@ -109,7 +109,7 @@ export default function ProductoDetailPage() {
 
       const { data: provs } = await catalogoClient
         .from('proveedores')
-        .select('id, nombre, slug, ciudad, logo_url, telefono, sitio_web')
+        .select('id, nombre, slug, ciudad, logo_url, telefono, web')
         .in('id', ids);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,10 +120,10 @@ export default function ProductoDetailPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setProveedores(
         (pp as any[]).map((row) => ({
-          precio:         row.precio         ?? null,
-          disponibilidad: row.disponibilidad ?? null,
-          url_producto:   row.url_producto   ?? null,
-          proveedores:    provMap[row.proveedor_id] ?? null,
+          precio:       row.precio_pen     ?? null,
+          stock:        row.stock          ?? null,
+          url_producto: row.url_producto   ?? null,
+          proveedores:  provMap[row.proveedor_id] ?? null,
         }))
       );
     })();
@@ -177,6 +177,11 @@ export default function ProductoDetailPage() {
         <h2 className="text-2xl font-bold tracking-tight leading-tight">
           {producto.modelo}
         </h2>
+        {producto.codigo_fabricante && (
+          <p className="text-xs text-muted-foreground font-mono mt-1">
+            Cód: {producto.codigo_fabricante}
+          </p>
+        )}
         <p className="text-muted-foreground mt-2 leading-relaxed">{producto.descripcion}</p>
       </div>
 
@@ -268,14 +273,14 @@ export default function ProductoDetailPage() {
               const p = pp.proveedores;
               if (!p) return null;
               const disponibilidadBadge = (() => {
-                const d = pp.disponibilidad?.toLowerCase() ?? '';
+                const d = pp.stock?.toLowerCase() ?? '';
                 if (d === 'en_stock' || d === 'en stock')
                   return <Badge className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 text-xs">En stock</Badge>;
                 if (d === 'agotado')
                   return <Badge className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 text-xs">Agotado</Badge>;
                 return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 text-xs">Consultar</Badge>;
               })();
-              const tiendaHref = pp.url_producto ?? p.sitio_web ?? null;
+              const tiendaHref = pp.url_producto ?? p.web ?? null;
               return (
                 <div key={i} className="flex items-start gap-4 rounded-lg border p-4">
                   {/* Logo o inicial */}
