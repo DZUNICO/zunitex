@@ -1,7 +1,8 @@
 // functions/src/callable/aprobarProveedor.ts
 
 import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
+import {auth, db} from "../config.js";
 
 interface AprobarData {
   uid: string;
@@ -66,25 +67,22 @@ export const aprobarProveedor = functions.https.onCall(async (data, context) => 
   }
 
   // 2. Asignar custom claim verified_seller
-  await admin.auth().setCustomUserClaims(typedData.uid, {
+  await auth.setCustomUserClaims(typedData.uid, {
     role: "verified_seller",
     admin: false,
   });
 
   // 3. Actualizar users/{uid} en Firestore
-  await admin.firestore().doc(`users/${typedData.uid}`).update({
+  await db.doc(`users/${typedData.uid}`).update({
     role: "verified_seller",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 
   // 4. Actualizar solicitudes_proveedor/{uid} a aprobado
-  await admin
-    .firestore()
-    .doc(`solicitudes_proveedor/${typedData.uid}`)
-    .update({
-      estado: "aprobado",
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+  await db.doc(`solicitudes_proveedor/${typedData.uid}`).update({
+    estado: "aprobado",
+    updatedAt: FieldValue.serverTimestamp(),
+  });
 
   // 5. Insertar proveedor en Supabase
   const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/proveedores`, {
