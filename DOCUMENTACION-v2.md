@@ -195,6 +195,35 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ---
 
+### [2026-05-19] — Fix admin token refresh + verificación claims en aprobarProveedor
+
+**Problema resuelto:**
+- CF `aprobarProveedor` retornaba 403 "Solo administradores pueden aprobar proveedores" aunque el usuario tenía `{ role: 'admin', admin: true }` en custom claims.
+- `aprobarProveedor.ts` incluía `region: data.ciudad` en el INSERT de Supabase, pero la columna `region` no existe en la tabla `proveedores` — causaría error 400 en paso 5.
+
+**Causa raíz (403):**
+`auth-context.tsx` → `onAuthStateChanged` llamaba `setUser(user)` SIN hacer `getIdToken(true)` primero. El token cacheado podía ser anterior a la asignación de custom claims via Admin SDK. Aunque `useCustomClaims` hace `getIdTokenResult(true)` después, hay una ventana de timing y posibles fallos silenciosos. El callable `httpsCallable` usa el token cacheado al momento de la llamada — si el refresh aún no completó, el token no tiene `admin: true`.
+
+**Cambios realizados:**
+
+- `src/lib/context/auth-context.tsx` — Callback de `onAuthStateChanged` cambiado a async. Se agrega `await user.getIdToken(true)` ANTES de `setUser(user)`. Garantiza que el token cacheado siempre tiene los últimos custom claims antes de que cualquier componente acceda al estado de auth.
+- `functions/src/callable/aprobarProveedor.ts` — Eliminado `region: data.ciudad` del body del INSERT en Supabase (columna inexistente, causaría error 400 en paso 5 tras resolver el 403).
+- `functions/lib/callable/aprobarProveedor.js` — Recompilado con `npm --prefix functions run build`.
+
+**Verificación CF (condición admin):**
+```typescript
+// aprobarProveedor.ts línea 25 — CORRECTA, no se modifica
+if (request.auth?.token?.admin !== true) {
+  throw new HttpsError("permission-denied", "Solo administradores pueden aprobar proveedores");
+}
+```
+
+**⚠️ DEPLOY REQUERIDO:** `firebase deploy --only functions:aprobarProveedor`
+
+**Estado:** ✅ Código listo — pendiente deploy de Cloud Function
+
+---
+
 ### [2026-05-19] — Fix confirmación post-registro proveedor + acceso admin a solicitudes
 
 **Problema resuelto:**

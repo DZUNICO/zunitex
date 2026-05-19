@@ -48,9 +48,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPersistence(auth, browserLocalPersistence);
 
     // Listener de cambios de autenticación
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Forzar refresh del token para obtener los últimos custom claims
+        // (necesario tras setCustomUserClaims con Admin SDK — el token anterior
+        // puede no incluir claims nuevos hasta que se fuerce un nuevo exchange).
+        try { await user.getIdToken(true); } catch { /* ignorado */ }
+      }
       setUser(user);
-      setLoading(false); // No bloquear en la escritura de Firestore
+      setLoading(false);
 
       if (user) {
         // Fire-and-forget: actualizar lastLogin (no-crítico, no bloquea el estado)

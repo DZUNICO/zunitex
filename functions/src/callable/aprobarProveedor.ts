@@ -103,7 +103,6 @@ export const aprobarProveedor = functions.https.onCall(async (request) => {
       descripcion: data.descripcion,
       telefono: data.telefono,
       web: data.web ?? null,
-      region: data.ciudad,
     }),
   });
 
