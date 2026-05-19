@@ -150,7 +150,7 @@ export function Navbar() {
             {menuItems.map((item) => (
               <MenuItem key={item.href} {...item} />
             ))}
-            {(userRole === 'verified_seller' || userRole === 'admin') && (
+            {userRole === 'verified_seller' && (
               <MenuItem {...proveedorItem} />
             )}
             {userRole === 'user' && (
@@ -220,7 +220,7 @@ export function Navbar() {
                       <MenuItem {...item} mobile />
                     </SheetClose>
                   ))}
-                  {(userRole === 'verified_seller' || userRole === 'admin') && (
+                  {userRole === 'verified_seller' && (
                     <SheetClose asChild>
                       <MenuItem {...proveedorItem} mobile />
                     </SheetClose>

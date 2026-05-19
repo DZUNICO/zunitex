@@ -195,6 +195,30 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ---
 
+### [2026-05-19] — Separación de roles: admin nunca ve Mi Portal
+
+**Problema resuelto:**
+- El link "Mi Portal" (`/proveedor`) aparecía para `admin` además de `verified_seller`, contradiciendo la arquitectura de roles donde admin es puramente administrativo.
+
+**Cambios realizados:**
+- `src/components/shared/protected-navbar.tsx` — Condicional del link "Mi Portal" cambiado de `(userRole === 'verified_seller' || userRole === 'admin')` → `userRole === 'verified_seller'`. Aplicado en desktop y Sheet móvil (2 ocurrencias con `replace_all`).
+
+**Comportamiento final por rol:**
+| Elemento | admin | verified_seller | user |
+|---|---|---|---|
+| Link "Admin" | ✅ | ❌ | ❌ |
+| Link "Mi Portal" | ❌ | ✅ | ❌ |
+| Link "¿Eres proveedor?" | ❌ | ❌ | ✅ |
+
+**Decisión de arquitectura registrada:** Ver sección "DECISIONES DE ARQUITECTURA → Admin es rol administrativo puro".
+
+**Testing realizado:**
+- ✅ `npm run build` — 26 rutas, 0 errores
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-19] — Fix aprobarProveedor: firma onCall v1 + imports admin-sdk + token refresh
 
 **Problema resuelto:**
@@ -1242,6 +1266,7 @@ export type UserType = 'profesional' | 'proveedor';
 - Para ser `verified_seller`: el admin asigna el role manualmente via Cloud Function `aprobarProveedor`
 - El `firebase_uid` del proveedor se vincula en la tabla `proveedores` de Supabase
 - ⚠️ **`userType` NO debe ser editable por el usuario** — eliminado del formulario de editar perfil (2026-05-18)
+- ⚠️ **`admin` es un rol puramente administrativo — NUNCA es proveedor.** Los proveedores tienen cuentas separadas. `admin` NO ve "Mi Portal" en la navbar. Solo `verified_seller` accede a `/proveedor`. (2026-05-19)
 
 ### Custom Claims (Firebase Auth)
 
@@ -1279,6 +1304,25 @@ Cuando un proveedor verificado se registra:
 ---
 
 ## DECISIONES DE ARQUITECTURA
+
+### [2026-05-19] Admin es rol administrativo puro — nunca proveedor
+
+**Decisión:** El rol `admin` en STARLOGIC es exclusivamente administrativo. Los proveedores son entidades comerciales externas (Electromack, distribuidores, etc.) con cuentas propias. Un admin nunca opera como proveedor dentro de la plataforma.
+
+**Consecuencias en UI:**
+- `admin` ve link "Admin" en navbar → `/admin`
+- `admin` NO ve "Mi Portal" (ruta `/proveedor`) — solo `verified_seller` la ve
+- `admin` NO ve "¿Eres proveedor?" — solo `user` la ve
+- Si en el futuro un admin necesita acceder a datos de proveedor, lo hace desde el panel `/admin/proveedores`, no desde el portal `/proveedor`
+
+**Razón:**
+- Separación legal entre STARLOGIC (plataforma) y los proveedores externos (Electromack y otros)
+- Neutralidad de plataforma: el admin no puede tener intereses comerciales como proveedor dentro de la misma plataforma que administra
+- Simplifica la lógica de roles: `verified_seller` es inequívocamente un proveedor comercial, sin ambigüedad
+
+**Archivo afectado:** `src/components/shared/protected-navbar.tsx` — condicional `(userRole === 'verified_seller' || userRole === 'admin')` corregido a `userRole === 'verified_seller'` en desktop y Sheet móvil.
+
+---
 
 ### Filosofía de Firestore Rules
 
