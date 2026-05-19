@@ -12,7 +12,6 @@ import type { ProductoCatalogo } from '@/types/catalogo';
 interface ProveedorProducto {
   precio: number | null;
   stock: string | null;
-  url_producto: string | null;
   proveedores: {
     nombre: string;
     slug: string;
@@ -96,7 +95,7 @@ export default function ProductoDetailPage() {
     (async () => {
       const { data: pp, error: ppError } = await catalogoClient
         .from('proveedor_producto')
-        .select('precio_pen, stock, url_producto, proveedor_id')
+        .select('precio_pen, stock, proveedor_id')
         .eq('producto_id', producto.id);
 
       if (ppError || !pp || pp.length === 0) {
@@ -120,10 +119,9 @@ export default function ProductoDetailPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setProveedores(
         (pp as any[]).map((row) => ({
-          precio:       row.precio_pen     ?? null,
-          stock:        row.stock          ?? null,
-          url_producto: row.url_producto   ?? null,
-          proveedores:  provMap[row.proveedor_id] ?? null,
+          precio:      row.precio_pen     ?? null,
+          stock:       row.stock          ?? null,
+          proveedores: provMap[row.proveedor_id] ?? null,
         }))
       );
     })();
@@ -280,7 +278,7 @@ export default function ProductoDetailPage() {
                   return <Badge className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 text-xs">Agotado</Badge>;
                 return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 text-xs">Consultar</Badge>;
               })();
-              const tiendaHref = pp.url_producto ?? p.web ?? null;
+              const tiendaHref = p.web ?? null;
               return (
                 <div key={i} className="flex items-start gap-4 rounded-lg border p-4">
                   {/* Logo o inicial */}
