@@ -94,6 +94,12 @@ export function RegisterForm() {
   return (
     <div className="min-h-screen flex flex-col p-4 sm:p-6 md:p-8">
       <div className="w-full max-w-md mx-auto space-y-6">
+        {/* Logo */}
+        <Link href="/" className="flex items-center justify-center gap-2 mb-2">
+          <Zap className="h-7 w-7 text-primary" />
+          <span className="font-bold text-2xl">STARLOGIC</span>
+        </Link>
+
         {/* Header */}
         <div className="text-center">
           <h1 className="text-2xl sm:text-3xl font-bold">Crear Cuenta</h1>

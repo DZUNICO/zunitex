@@ -90,11 +90,10 @@ export function LoginForm() {
     <div className="min-h-screen flex flex-col justify-center px-4 py-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* Logo */}
-        <div className="flex justify-center mb-6">
-          <div className="bg-primary/10 p-3 rounded-full">
-            <Zap className="w-8 h-8 text-primary" />
-          </div>
-        </div>
+        <Link href="/" className="flex items-center justify-center gap-2 mb-6">
+          <Zap className="h-7 w-7 text-primary" />
+          <span className="font-bold text-2xl">STARLOGIC</span>
+        </Link>
         
         <h2 className="text-center text-2xl font-bold tracking-tight mb-2">
           Bienvenido de nuevo

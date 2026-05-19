@@ -181,10 +181,10 @@ export default function RegistroProveedorPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-6">
+        <Link href="/" className="flex items-center justify-center gap-2 mb-6">
           <Zap className="h-7 w-7 text-primary" />
           <span className="font-bold text-2xl">STARLOGIC</span>
-        </div>
+        </Link>
 
         <Card>
           <CardHeader className="pb-4">
