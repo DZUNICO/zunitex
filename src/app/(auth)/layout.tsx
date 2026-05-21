@@ -3,6 +3,7 @@
 import { useAuth } from '@/lib/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { PublicNavbar } from '@/components/shared/public-navbar';
 
 export default function AuthLayout({
   children,
@@ -21,5 +22,10 @@ export default function AuthLayout({
   if (loading) return null;
   if (user) return null;
 
-  return <>{children}</>;
+  return (
+    <>
+      <PublicNavbar />
+      {children}
+    </>
+  );
 }

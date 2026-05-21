@@ -195,6 +195,26 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ---
 
+### [2026-05-20] — Navbar en páginas de autenticación
+
+**Funcionalidad agregada:** Las páginas `/login`, `/register` y `/forgot-password` ahora muestran la `PublicNavbar`, igual que `/registro-proveedor`.
+
+**Causa raíz del problema:** El grupo `(auth)/layout.tsx` solo tenía la guardia de redirección pero no renderizaba navbar. El grupo `(public)/layout.tsx` sí provee navbar a todas sus rutas hijas (incluyendo `registro-proveedor`).
+
+**Solución elegida: Opción A — Modificar `(auth)/layout.tsx`**
+- Opción B (mover páginas a `(public)/`) rompería la guardia de redirección que vive en el layout del grupo
+- Opción C (layout por página) duplicaría código en 3 sitios
+- Opción A es la menos invasiva: una sola línea de import + agregar `<PublicNavbar />` antes de `{children}`
+
+**Decisión de implementación:** El layout del grupo `(auth)/` siempre muestra `<PublicNavbar />` (nunca `<Navbar />`/protected) porque cuando se llega al `return`, por definición `user === null` — el layout ya redirige si el usuario está autenticado.
+
+**Archivos modificados:**
+- `src/app/(auth)/layout.tsx` — Agrega `import { PublicNavbar }` + wraps `{children}` con `<PublicNavbar />` antes
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-19] — Fix proveedores en detalle producto + codigo_fabricante visible
 
 **Problemas resueltos:**
