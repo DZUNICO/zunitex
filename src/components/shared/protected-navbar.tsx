@@ -43,12 +43,14 @@ const menuItems = [
     href: '/blog',
     description: 'Artículos y tutoriales'
   },
+  /* COMUNIDAD — oculto temporalmente hasta tener usuarios reales
   {
     icon: Users,
     label: 'Comunidad',
     href: '/community',
     description: 'Conecta con otros electricistas'
   },
+  */
   {
     icon: BookOpen,
     label: 'Catálogo',
