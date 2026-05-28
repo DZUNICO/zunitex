@@ -2813,5 +2813,302 @@ Sentry (3):
 
 1. Configurar dominio custom (opcional)
 2. Monitorear errores en Sentry
+
+---
+
+## 🏭 STARLOGIC Data Pipeline
+
+**Versión:** 1.0 | **Fecha:** Mayo 2026  
+**Propósito:** Sistema de ingesta de fichas técnicas de cables eléctricos usando IA (Claude) para extracción automática de atributos, revisión humana y carga al catálogo de productos.
+
+### Visión general
+
+El pipeline toma un PDF de ficha técnica, extrae todos los atributos técnicos con Claude, los almacena en `pipeline_candidatos` para revisión del operador admin, y tras aprobación los inserta en `productos_catalogo`. Diseñado para procesar 20–50 productos por semana.
+
+```
+PDF subido por admin
+      ↓
+POST /api/pipeline/extract   (Claude API)
+      ↓
+pipeline_candidatos  (status='pending')
+      ↓
+Revisión en /admin/pipeline/[id]
+      ↓
+POST /api/pipeline/approve
+      ↓
+productos_catalogo   (disponible_peru=false)
+```
+
+---
+
+### Supabase — Tabla `pipeline_candidatos`
+
+Tabla en el proyecto **STARLOGIC-CATALOGO** (`cnjvtzwsqzzvqfdbaisv`).  
+RLS habilitado sin políticas — solo accesible con service key (server-side).
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid | PK, `gen_random_uuid()` |
+| `created_at` | timestamptz | default `now()` |
+| `updated_at` | timestamptz | actualizado por trigger automático |
+| `source` | text | `'pdf_upload'` \| `'web_scrape'` |
+| `pdf_filename` | text | nombre original del archivo subido |
+| `raw_pdf_url` | text | URL pública si existe (null para uploads directos) |
+| `fabricante` | text | detectado por Claude o declarado por el operador |
+| `tipo_cable` | text | valor raw tal como lo reporta Claude / operador |
+| `tipo_cable_normalizado` | text | clave del diccionario `CABLE_NOMENCLATURE` (ej: `"TW-80"`) |
+| `status` | text | `'pending'` \| `'approved'` \| `'rejected'` |
+| `confidence_score` | float | 0.0 a 1.0, promedio de scores de Claude |
+| `raw_json` | jsonb | JSON extraído por Claude — **nunca se modifica** |
+| `edited_json` | jsonb | copia editable del operador (auto-guardada) |
+| `final_json` | jsonb | versión definitiva al momento de aprobar |
+| `reviewed_by` | text | Firebase UID del admin que aprobó/rechazó |
+| `reviewed_at` | timestamptz | timestamp de la decisión |
+| `notas` | text | notas libres del operador |
+| `producto_id` | uuid | FK → `productos_catalogo.id` (se llena al aprobar) |
+
+> ⚠️ **Columnas que NO existen en la tabla base de `productos_catalogo`**: `tipo_cable`, `tipo_cable_normalizado`, `confidence_score`. Esas son exclusivas de `pipeline_candidatos`.
+
+> ⚠️ **REGLA CRÍTICA**: Antes de cualquier query, verificar columnas contra este schema. `raw_json` y `edited_json` son JSONB — no tienen columnas propias, todo está embebido.
+
+---
+
+### Archivos creados
+
+#### Librerías internas (`src/lib/pipeline/`)
+
+| Archivo | Descripción |
+|---|---|
+| `src/lib/pipeline/cable-nomenclature.ts` | Diccionario `CABLE_NOMENCLATURE` (19 tipos de cable), `normalizarTipoCable()`, `getAliasesPorTipo()`, `AWG_TO_MM2` (AWG 18–500 + MCM), `MM2_TO_AWG`. **Fuente de verdad de nomenclatura del mercado peruano.** |
+| `src/lib/pipeline/schemas.ts` | `STARLOGIC_SCHEMA` (schema de referencia completo TW-80 INDECO) + `SYSTEM_PROMPT` autogenerado con `JSON.stringify(schema)`. Re-exporta `AWG_TO_MM2` desde `cable-nomenclature`. |
+| `src/lib/pipeline/types.ts` | Tipos TypeScript completos: `PipelineCandidato`, `ExtraccionResult`, `ProductoCore`, `Variante`, `DataQuality`, `PipelineStatus`, `SourceType`. |
+
+#### Clientes de servicio
+
+| Archivo | Descripción |
+|---|---|
+| `src/lib/supabase/pipeline-client.ts` | `getPipelineClient()` — cliente Supabase lazy con `SUPABASE_CATALOGO_SERVICE_KEY`. Solo instancia al primer uso (evita throw durante `next build`). |
+| `src/lib/firebase/admin.ts` | `verifyAdminToken(token)` → boolean. `getVerifiedAdmin(token)` → `{ uid, email } \| null`. Inicialización dual: `FIREBASE_SERVICE_ACCOUNT_JSON` en Vercel, ADC en local. |
+
+---
+
+### API Routes
+
+Todas requieren `Authorization: Bearer {firebase_id_token}` de usuario con claim `admin: true`.
+
+| Método | Ruta | Qué hace | Retorna |
+|---|---|---|---|
+| POST | `/api/pipeline/extract` | Recibe PDF (multipart/form-data), llama a Claude con el PDF en base64 + SYSTEM_PROMPT, parsea JSON, normaliza tipo_cable, inserta en `pipeline_candidatos` | `{ candidato_id, confidence_score, variantes_count, parse_error }` |
+| GET | `/api/pipeline/candidates` | Lista todos los candidatos ordenados por fecha desc. Calcula `variantes_count` desde `raw_json.VARIANTES.length` sin exponer el JSON completo | `{ candidatos: CandidatoRow[] }` |
+| GET | `/api/pipeline/candidates/[id]` | Devuelve candidato completo incluyendo `raw_json` y `edited_json` | `{ candidato: PipelineCandidato }` |
+| PATCH | `/api/pipeline/candidates/[id]` | Auto-save del editor: actualiza `edited_json` y/o `notas` | `{ saved: true }` |
+| POST | `/api/pipeline/reject` | Marca candidato como `rejected`. Solo actúa si `status='pending'`. Registra `reviewed_by` + `reviewed_at` | `{ rejected: true }` |
+| POST | `/api/pipeline/approve` | Mapea `PRODUCTO_CORE` → `productos_catalogo`, embebe `VARIANTES` en `atributos.variantes`, inserta con `disponible_peru=false`. Marca candidato `approved` con `producto_id` | `{ producto_id, approved: true }` |
+
+**Campos del formulario en `/api/pipeline/extract` (multipart/form-data):**
+
+| Campo | Tipo | Requerido | Notas |
+|---|---|---|---|
+| `pdf` | File | ✅ | `application/pdf`, máximo 20 MB |
+| `fabricante` | string | ❌ | Hint para Claude si no está claro en el PDF |
+| `tipo_cable` | string | ❌ | Uno de los 17 tipos del select en la UI |
+
+---
+
+### Páginas admin
+
+| Ruta | Archivo | Descripción |
+|---|---|---|
+| `/admin/pipeline` | `src/app/(protected)/admin/pipeline/page.tsx` | Lista de candidatos con tabs Pendientes / Aprobados / Rechazados. Formulario de subida de PDF con progress indicator de 3 fases. Confidence badges con color. |
+| `/admin/pipeline/[id]` | `src/app/(protected)/admin/pipeline/[id]/page.tsx` | Review Interface: split view PDF (iframe) + editor estructurado con secciones colapsables (Core, Variantes, Quality, Notas). Auto-save debounce 2s. Botones Rechazar / Aprobar e Insertar. |
+| `/admin/pipeline/test-token` | `src/app/(protected)/admin/pipeline/test-token/page.tsx` | **Solo desarrollo local.** Muestra el Firebase ID token del usuario actual para testing de APIs. Eliminar en producción. |
+
+---
+
+### Variables de entorno nuevas requeridas
+
+Agregar a `.env.local` (local) y a Vercel Environment Variables (producción):
+
+```env
+# Anthropic / Claude API — requerido para POST /api/pipeline/extract
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Supabase — service key (bypassa RLS, NUNCA exponer al cliente)
+# Requerido para todas las rutas /api/pipeline/*
+SUPABASE_CATALOGO_SERVICE_KEY=eyJ...
+
+# Firebase Admin SDK — requerido para verificar tokens admin en API routes
+# En Vercel: JSON completo del service account como string
+# En local: dejar vacío y usar gcloud auth application-default login
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+```
+
+> ⚠️ `NEXT_PUBLIC_SUPABASE_CATALOGO_URL` ya estaba configurada. Las tres variables nuevas son **server-only** — nunca deben tener el prefijo `NEXT_PUBLIC_`.
+
+---
+
+### Flujo completo de datos
+
+```
+1. Operador sube PDF desde /admin/pipeline
+         ↓
+2. POST /api/pipeline/extract
+   → verifica token Firebase (admin claim)
+   → valida PDF: tipo application/pdf, tamaño ≤ 20 MB, no vacío
+   → convierte PDF a base64
+   → llama Claude API:
+       model:  claude-sonnet-4-5
+       system: SYSTEM_PROMPT (schema completo de cables)
+       user:   PDF (document block) + "fabricante: X, tipo_cable: Y"
+   → parsea JSON de respuesta (limpia markdown fences si los hay)
+   → valida estructura mínima: PRODUCTO_CORE + VARIANTES[]
+   → si JSON inválido: fallback con confidence_score=0.1, notas="Parse error: ..."
+   → calcula confidence_score: promedio de PRODUCTO_CORE.data_quality.confidence_score
+     + todos los VARIANTES[i].data_quality.confidence_score
+   → normaliza tipo_cable con normalizarTipoCable()
+   → INSERT pipeline_candidatos (status='pending', raw_json inmutable)
+   → retorna { candidato_id, confidence_score, variantes_count, parse_error }
+         ↓
+3. Browser redirige a /admin/pipeline/{candidato_id}
+         ↓
+4. GET /api/pipeline/candidates/{id}
+   → retorna candidato completo
+   → UI pre-llena editor con: edited_json ?? raw_json
+         ↓
+5. Operador revisa y edita campos en el formulario estructurado
+   → cada cambio → debounce 2s → PATCH /api/pipeline/candidates/{id}
+     (actualiza edited_json + notas, NO modifica raw_json)
+         ↓
+6a. Operador rechaza
+    → POST /api/pipeline/reject
+    → UPDATE status='rejected', reviewed_by, reviewed_at
+    → redirect a /admin/pipeline
+
+6b. Operador aprueba
+    → flush del auto-save pendiente
+    → POST /api/pipeline/approve
+    → resuelve final_json = edited_json ?? raw_json
+    → mapea PRODUCTO_CORE → productos_catalogo:
+        marca         ← fabricante
+        modelo        ← nombre_comercial
+        descripcion   ← descripcion_corta
+        categoria     ← tipo_cable ?? familia
+        slug          ← slugify(marca-modelo) + sufijo único (timestamp base36)
+        atributos     ← specs técnicas + VARIANTES embebidas en atributos.variantes
+        normas        ← normas_producto[]
+        nombres_alternativos ← aliases_busqueda[]
+        disponible_peru = false   ← operador activa después
+        codigo_fabricante ← VARIANTES[0].sku_fabricante
+    → INSERT productos_catalogo
+    → UPDATE pipeline_candidatos:
+        status='approved', final_json, producto_id, reviewed_by, reviewed_at
+    → redirect a /admin/pipeline
+```
+
+---
+
+### Estructura del JSON extraído por Claude (`ExtraccionResult`)
+
+```typescript
+{
+  fabricante:   string | null,   // top-level para pipeline_candidatos
+  tipo_cable:   string | null,   // top-level para pipeline_candidatos
+
+  PRODUCTO_CORE: {
+    product_id, tipo_producto, nivel_tension, tipo_cable, nombre_comercial,
+    familia, subfamilia, fabricante, marca_comercial, pais_fabricacion,
+    descripcion_corta, descripcion_tecnica, tension_nominal,
+    temperatura_operacion_c, temperatura_cortocircuito_c,
+    material_conductor, clase_conductor, material_aislamiento, material_cubierta,
+    propiedades, clasificacion_incendio, tension_prueba_dielectrica,
+    metodos_instalacion, aplicaciones, normas_producto, normas_ensayo,
+    certificaciones, aliases_busqueda, normalizacion_tecnica,
+    data_quality: { confidence_score, fuente_tipo, manual_reviewed, ... },
+    media, estado_catalogo, source_metadata
+  },
+
+  VARIANTES: [          // ARRAY — una entrada por calibre/sección en el PDF
+    {
+      variant_id, product_id, sku_fabricante, codigo_pais, configuracion_display,
+      conductores, seccion, normalizacion_tecnica, diametros,
+      peso_kg_km, performance_electrica: { ampacidad: { aire_a, ducto_a, ... } },
+      colores_disponibles, presentacion, pricing, stock_metadata,
+      data_quality: { confidence_score, ... }
+    }
+  ],
+
+  EXTENSIONES_DINAMICAS: { construccion, energia_bt, flexible, control, solar, mineria },
+  GRAPH_RELATIONS:        { equivalencias, reemplazos, compatibilidades, ... }
+}
+```
+
+---
+
+### Diccionario de nomenclatura (`cable-nomenclature.ts`)
+
+**Principio de diseño:** el graph habla el idioma del mercado peruano. La norma técnica es metadata de referencia, no la capa principal.
+
+| Campo | Ejemplo TW-80 | Propósito |
+|---|---|---|
+| `tipo_mercado_peru` | `"TW-80"` | Como lo busca el técnico peruano. Clave del diccionario. |
+| `tipo_tecnico_ntp` | `"TW-70"` | Denominación oficial INDECOPI/NTP. |
+| `codigo_iec` | `"60227 IEC 01"` | Designación IEC para exportación/ingeniería. |
+| `nombres_fabricantes` | `{ INDECO: "TW-80 +PLUS", CELSA: "TW-80" }` | Nombres comerciales reales por marca. |
+| `aliases_busqueda_peru` | `["cable tw 14", "cable de luz", ...]` | Keywords SEO reales del mercado. |
+
+**19 tipos documentados:** TW-80, THW-90, NH, N2XOH, NYY, N2XY, RV-K, NLT, CTM, GPT, WS, SGT, SOLAR_DC, UTP_CAT6, FPL, DESNUDO_TEMPLE_BLANDO (+ N2XY, RV-K)
+
+**Función `normalizarTipoCable(input)`:** recibe cualquier string (ej: `"tw"`, `"TW-80 +PLUS"`, `"TTRF-70"`, `"LSOH"`) y retorna la clave del diccionario (ej: `"TW-80"`, `"NH"`) o `null` si no hay match.
+
+---
+
+### Decisiones de diseño
+
+**`raw_json` es inmutable.**  
+Claude escribe en `raw_json` una sola vez al momento de la extracción. El operador edita `edited_json`. `final_json` es la copia aprobada. Esto permite auditar qué extrajo la IA vs. qué aprobó el humano.
+
+**`disponible_peru=false` por defecto al aprobar.**  
+El producto se inserta en `productos_catalogo` pero oculto. El operador lo activa manualmente después de verificar precio, disponibilidad real y presentación en el catálogo.
+
+**`tipo_cable` y `tipo_cable_normalizado` coexisten.**  
+`tipo_cable` guarda el valor raw tal como lo reportó Claude o el operador (ej: `"TW"`, `"tw-80 plus"`, `"LSOH"`). `tipo_cable_normalizado` guarda la clave del diccionario (ej: `"TW-80"`, `"NH"`). Ambos se preservan para trazabilidad y para permitir búsquedas exactas o normalizadas.
+
+**`VARIANTES` es siempre un array.**  
+Cada fila de calibre/sección en la tabla del PDF genera una entrada independiente en `VARIANTES[]`. Un cable TW-80 de 4 calibres → 4 objetos `Variante`. Al aprobar, el array completo se embebe en `productos_catalogo.atributos.variantes` (JSONB), ya que `productos_catalogo` no tiene tabla de variantes separada.
+
+**Malformed JSON fallback.**  
+Si Claude devuelve JSON no parseable, el sistema igualmente inserta el candidato con `confidence_score=0.1`, `status='pending'` y `notas="Parse error: ..."`. El operador decide en la Review Interface si rechaza o edita manualmente.
+
+**Service key con inicialización lazy.**  
+`getPipelineClient()` solo lanza error si las env vars no existen *al momento de la primera llamada en runtime*, no al importar el módulo. Esto permite que `next build` compile el bundle en Vercel aunque `SUPABASE_CATALOGO_SERVICE_KEY` no esté en el entorno de build.
+
+**Auto-save con debounce de 2 segundos.**  
+Cada cambio en el editor de la Review Interface programa un PATCH a `/api/pipeline/candidates/[id]` con delay de 2s. Si el operador aprueba o rechaza antes de que se ejecute, el save se hace síncronamente antes de la acción. El operador nunca pierde cambios.
+
+---
+
+### Dependencias nuevas
+
+| Paquete | Versión | Propósito |
+|---|---|---|
+| `@anthropic-ai/sdk` | `^0.100.0` | SDK oficial de Anthropic para llamar a Claude desde Node.js server-side |
+
+```bash
+# Ya instalado:
+npm install @anthropic-ai/sdk
+```
+
+> Firebase Admin SDK (`firebase-admin`) ya estaba en el proyecto. Supabase JS (`@supabase/supabase-js`) también. Solo se agregó el SDK de Anthropic.
+
+---
+
+### Commits del pipeline (Mayo 2026)
+
+| Hash | Descripción |
+|---|---|
+| `f32c955` | feat: pipeline de datos — extractor PDF con Claude + interfaz admin |
+| `ad59348` | feat: pipeline paso 6 — review interface + APIs de aprobación y rechazo |
+| `1a32a52` | fix: modelo Claude correcto (claude-sonnet-4-5) + página test-token |
+| `a66ed0e` | feat: diccionario de nomenclatura de cables + normalización en pipeline |
 3. Analizar performance en Vercel Analytics
 4. Implementar mejoras según feedback de usuarios
