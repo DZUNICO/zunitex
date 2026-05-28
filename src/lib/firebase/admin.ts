@@ -38,3 +38,20 @@ export async function verifyAdminToken(token: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Igual que verifyAdminToken pero también devuelve el uid del usuario.
+ * Retorna null si el token es inválido o el usuario no es admin.
+ */
+export async function getVerifiedAdmin(
+  token: string,
+): Promise<{ uid: string; email: string | undefined } | null> {
+  try {
+    initAdmin();
+    const decoded = await getAuth().verifyIdToken(token, /* checkRevoked */ true);
+    if (decoded.admin !== true) return null;
+    return { uid: decoded.uid, email: decoded.email };
+  } catch {
+    return null;
+  }
+}
