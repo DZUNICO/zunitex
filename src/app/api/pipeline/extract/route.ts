@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     });
 
     const message = await anthropic.messages.create({
-      model:      'claude-sonnet-4-20250514',
+      model:      'claude-sonnet-4-5',
       max_tokens: 8000,
       system:     SYSTEM_PROMPT,
       messages: [
