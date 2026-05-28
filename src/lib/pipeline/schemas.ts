@@ -4,25 +4,7 @@
 // Actualizar aquí → se propaga automáticamente al SYSTEM_PROMPT.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Tabla AWG → mm² estándar (IEC 60228)
-export const AWG_TO_MM2: Record<string, number> = {
-  '14':   2.08,
-  '12':   3.31,
-  '10':   5.26,
-  '8':    8.37,
-  '6':    13.3,
-  '4':    21.2,
-  '2':    33.6,
-  '1':    42.4,
-  '1/0':  53.5,
-  '2/0':  67.4,
-  '3/0':  85.0,
-  '4/0':  107.2,
-  '300MCM': 152,
-  '350MCM': 177,
-  '500MCM': 253,
-  '750MCM': 380,
-};
+export { AWG_TO_MM2 } from './cable-nomenclature';
 
 // ── Schema de referencia (ejemplo TW-80 INDECO) ───────────────────────────────
 // Sirve como plantilla que Claude debe replicar con los datos del PDF.

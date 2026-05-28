@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import Anthropic                     from '@anthropic-ai/sdk';
-import { SYSTEM_PROMPT }             from '@/lib/pipeline/schemas';
-import type { ExtraccionResult }     from '@/lib/pipeline/types';
-import { getPipelineClient }         from '@/lib/supabase/pipeline-client';
-import { verifyAdminToken }          from '@/lib/firebase/admin';
-import { logger }                    from '@/lib/utils/logger';
+import { NextRequest, NextResponse }        from 'next/server';
+import Anthropic                           from '@anthropic-ai/sdk';
+import { SYSTEM_PROMPT }                   from '@/lib/pipeline/schemas';
+import type { ExtraccionResult }           from '@/lib/pipeline/types';
+import { normalizarTipoCable }             from '@/lib/pipeline/cable-nomenclature';
+import { getPipelineClient }               from '@/lib/supabase/pipeline-client';
+import { verifyAdminToken }                from '@/lib/firebase/admin';
+import { logger }                          from '@/lib/utils/logger';
 
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
 
@@ -209,21 +210,26 @@ export async function POST(request: NextRequest) {
     extractedJson?.PRODUCTO_CORE?.tipo_cable ??
     tipo_cable;
 
+  // Normalización del tipo de cable al diccionario estándar del mercado peruano
+  const tipoCableNormalizado =
+    tipoCableDetectado ? normalizarTipoCable(tipoCableDetectado) : null;
+
   // ── 8. INSERT en pipeline_candidatos ────────────────────────────────────
   const insertPayload = {
-    source:           'pdf_upload' as const,
-    pdf_filename:     pdfFilename,
-    raw_pdf_url:      null,           // no hay URL externa para uploads directos
-    fabricante:       fabricanteDetectado ?? null,
-    tipo_cable:       tipoCableDetectado ?? null,
-    status:           'pending'  as const,
-    confidence_score: confidenceScore,
-    raw_json:         finalRawJson,
-    edited_json:      null,
-    final_json:       null,
-    reviewed_by:      null,
-    reviewed_at:      null,
-    notas:            parseError ? `Parse error: ${parseError}` : null,
+    source:                  'pdf_upload' as const,
+    pdf_filename:            pdfFilename,
+    raw_pdf_url:             null,
+    fabricante:              fabricanteDetectado ?? null,
+    tipo_cable:              tipoCableDetectado ?? null,
+    tipo_cable_normalizado:  tipoCableNormalizado,
+    status:                  'pending'  as const,
+    confidence_score:        confidenceScore,
+    raw_json:                finalRawJson,
+    edited_json:             null,
+    final_json:              null,
+    reviewed_by:             null,
+    reviewed_at:             null,
+    notas:                   parseError ? `Parse error: ${parseError}` : null,
   };
 
   const { data: inserted, error: dbError } = await getPipelineClient()
