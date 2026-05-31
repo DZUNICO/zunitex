@@ -820,31 +820,45 @@ export default function PipelineReviewPage() {
                               {kwSuggestions.variante.length > 0 && (
                                 <div className="space-y-1.5">
                                   <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                                    Por variante — solo referencia ({kwSuggestions.variante.length})
+                                    Por calibre — click para agregar al core ({kwSuggestions.variante.length})
                                   </span>
                                   <div className="flex flex-wrap gap-1.5">
-                                    {kwSuggestions.variante.map((s, i) => (
-                                      <span
-                                        key={i}
-                                        title={`${s.avg_monthly_searches.toLocaleString()} búsq/mes · ${s.competition ?? '—'} competencia`}
-                                        className="inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700"
-                                      >
-                                        {s.keyword}
-                                        <span className="opacity-60 text-[10px]">
-                                          {s.avg_monthly_searches >= 1000
-                                            ? `${(s.avg_monthly_searches / 1000).toFixed(0)}k`
-                                            : s.avg_monthly_searches}
-                                        </span>
-                                        {s.competition && (
-                                          <span className={`text-[10px] ${
-                                            s.competition === 'Baja'  ? 'text-green-600 dark:text-green-400' :
-                                            s.competition === 'Media' ? 'text-yellow-600 dark:text-yellow-400' :
-                                                                        'text-red-600 dark:text-red-400'
-                                          }`}>● {s.competition}</span>
-                                        )}
-                                      </span>
-                                    ))}
+                                    {kwSuggestions.variante.map((s, i) => {
+                                      const already = (core?.aliases_busqueda ?? []).includes(s.keyword) || acceptedKw.has(s.keyword);
+                                      return (
+                                        <button
+                                          key={i}
+                                          type="button"
+                                          title={`${s.avg_monthly_searches.toLocaleString()} búsq/mes · ${s.competition ?? '—'} competencia`}
+                                          onClick={() => !isDone && !already && acceptKw(s.keyword)}
+                                          disabled={isDone || already}
+                                          className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border transition-colors ${
+                                            already
+                                              ? 'bg-muted text-muted-foreground border-border opacity-50 cursor-default'
+                                              : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700 hover:opacity-80 cursor-pointer'
+                                          }`}
+                                        >
+                                          {already ? <Check className="h-2.5 w-2.5" /> : <Plus className="h-2.5 w-2.5" />}
+                                          {s.keyword}
+                                          <span className="opacity-60 text-[10px]">
+                                            {s.avg_monthly_searches >= 1000
+                                              ? `${(s.avg_monthly_searches / 1000).toFixed(0)}k`
+                                              : s.avg_monthly_searches}
+                                          </span>
+                                          {s.competition && (
+                                            <span className={`text-[10px] ${
+                                              s.competition === 'Baja'  ? 'text-green-600 dark:text-green-400' :
+                                              s.competition === 'Media' ? 'text-yellow-600 dark:text-yellow-400' :
+                                                                          'text-red-600 dark:text-red-400'
+                                            }`}>● {s.competition}</span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Estas keywords incluyen calibres específicos. Se agregarán al core — el buscador las capturará igual.
+                                  </p>
                                 </div>
                               )}
 
