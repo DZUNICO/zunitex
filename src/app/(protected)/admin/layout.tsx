@@ -7,9 +7,7 @@ export default function AdminLayout({
 }) {
   return (
     <AdminRoute>
-      <div className="container mx-auto px-4 py-8">
-        {children}
-      </div>
+      {children}
     </AdminRoute>
   );
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams }                       from 'next/navigation';
 import { useAuth }                                    from '@/lib/context/auth-context';
-import { AdminRoute }                                 from '@/components/shared/admin-route';
 import { Button }                                     from '@/components/ui/button';
 import { Input }                                      from '@/components/ui/input';
 import { Badge }                                      from '@/components/ui/badge';
@@ -517,8 +516,7 @@ export default function PipelineReviewPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <AdminRoute>
-      <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden">
 
         {/* ── Top header ──────────────────────────────────────────────────── */}
         <div className="border-b bg-background px-4 py-2.5 flex items-center gap-3 flex-shrink-0">
@@ -1035,6 +1033,5 @@ export default function PipelineReviewPage() {
           </div>
         )}
       </div>
-    </AdminRoute>
   );
 }
