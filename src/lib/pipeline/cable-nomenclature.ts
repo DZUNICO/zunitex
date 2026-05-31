@@ -41,8 +41,10 @@ export interface CableDefinicion {
 
   // NOTAS TÉCNICAS
   notas: string
-  reemplaza_a?: string               // tipo que reemplaza (para graph)
+  reemplaza_a?: string | string[]    // tipo(s) que reemplaza (para graph)
   reemplazado_por?: string           // tipo que lo reemplazó
+  notas_sustitucion?: string         // historia de sustitución del producto
+  status?: 'activo' | 'descontinuado'
 }
 
 export const CABLE_NOMENCLATURE: Record<string, CableDefinicion> = {
@@ -132,12 +134,43 @@ export const CABLE_NOMENCLATURE: Record<string, CableDefinicion> = {
       "cable nh 80 indeco", "cable nh 90 indeco", "alambre nh",
       "cable libre halogenos", "cable lsoh", "cable nh 80 4mm2",
       "pc nh-90", "cable nh precio", "cable nh celsa",
+      "nh 80", "alambre nh 80", "nhx 90", "cable nhx 90",
+      "cable nhx-90", "nh-80 indeco", "nhx 90 indeco",
     ],
-    busquedas_mensuales_aprox: "100-1,000 (NH), 10-100 (LSOH indeco)",
+    busquedas_mensuales_aprox: "NH: 100-1,000/mes, NH-80: 100-1,000/mes, NHX-90: 10-100/mes, LSOH: 10-100/mes",
 
     familia: "construccion",
     subfamilia: "nh",
+    reemplaza_a: ["NH-80", "NHX-90"],
     notas: "NH es el nombre de mercado en Perú. Técnicamente es LSOH/H07Z1-R. 'PC' en PC NH-90 de Indeco significa línea Practicable — no es denominación técnica. El graph usa 'NH' como tipo_mercado_peru porque así lo busca y conoce el mercado peruano. Las búsquedas de 'lsoh indeco' son 10-100/mes vs 'cable nh 80' 100-1000/mes.",
+    notas_sustitucion: "INDECO fabricaba NH-80 (LSOH 80°C) y NHX-90 (LSOH 90°C) como productos separados. Aproximadamente 2023-2024 estandarizó en un solo producto NH-90. Técnicos y especificadores peruanos aún usan NH-80 y NHX-90 en requerimientos. El NH-90 actual es el sustituto directo de ambos. El graph debe redirigir búsquedas de NH-80 y NHX-90 hacia NH-90.",
+  },
+
+  "NHX-90": {
+    tipo_mercado_peru: "NHX-90",
+    descripcion_mercado: "Cable libre de halógenos 90°C — producto INDECO descontinuado (~2023-2024). Reemplazado por PC NH-90.",
+
+    tipo_tecnico_ntp: "LSOH",
+    codigo_iec: "H07Z1-R (CL2)",
+    norma_producto: ["NTP 370.266-3-31", "IEC 60332-3-24"],
+    temperatura_c: 90,
+    aislamiento_tecnico: "HFFR",
+
+    nombres_fabricantes: {
+      INDECO: "NHX-90 (descontinuado — reemplazado por PC NH-90)",
+    },
+
+    aliases_busqueda_peru: [
+      "cable nhx 90", "cable nhx-90", "nhx 90 indeco",
+      "nhx-90 indeco", "cable nhx",
+    ],
+    busquedas_mensuales_aprox: "10-100/mes",
+
+    status: 'descontinuado',
+    familia: "construccion",
+    subfamilia: "nh",
+    reemplazado_por: "NH",
+    notas: "Producto descontinuado por INDECO (~2023-2024). Era la versión 90°C del cable libre de halógenos, distinto del NH-80 (80°C). Reemplazado por el producto unificado PC NH-90. El graph debe redirigir cualquier búsqueda de NHX-90 hacia NH.",
   },
 
   // ── ENERGÍA BT ────────────────────────────────────────────────────────────
@@ -512,6 +545,7 @@ export function normalizarTipoCable(input: string): string | null {
   if (s.includes("RV-K") || s.includes("RVK")) return "RV-K"
   if (s.includes("THW")) return "THW-90"
   if ((s.includes("TW") && !s.includes("THW") && !s.includes("THWN"))) return "TW-80"
+  if (s.includes("NHX")) return "NHX-90"           // NHX-90 → entrada descontinuada
   if (s.includes("NH") || s.includes("LSOH") || s.includes("LSHF") || s.includes("H07Z1")) return "NH"
   if (s.includes("HFFR") && !s.includes("N2X")) return "NH"
   if (s.includes("NLT") || s.includes("TTRF") || s.includes("PRACTICABLE")) return "NLT"
