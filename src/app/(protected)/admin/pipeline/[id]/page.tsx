@@ -803,6 +803,13 @@ export default function PipelineReviewPage() {
                                               ? `${(s.avg_monthly_searches / 1000).toFixed(0)}k`
                                               : s.avg_monthly_searches}
                                           </span>
+                                          {s.competition && (
+                                            <span className={`text-[10px] ${
+                                              s.competition === 'Baja'  ? 'text-green-600 dark:text-green-400' :
+                                              s.competition === 'Media' ? 'text-yellow-600 dark:text-yellow-400' :
+                                                                          'text-red-600 dark:text-red-400'
+                                            }`}>● {s.competition}</span>
+                                          )}
                                         </button>
                                       );
                                     })}
@@ -828,6 +835,13 @@ export default function PipelineReviewPage() {
                                             ? `${(s.avg_monthly_searches / 1000).toFixed(0)}k`
                                             : s.avg_monthly_searches}
                                         </span>
+                                        {s.competition && (
+                                          <span className={`text-[10px] ${
+                                            s.competition === 'Baja'  ? 'text-green-600 dark:text-green-400' :
+                                            s.competition === 'Media' ? 'text-yellow-600 dark:text-yellow-400' :
+                                                                        'text-red-600 dark:text-red-400'
+                                          }`}>● {s.competition}</span>
+                                        )}
                                       </span>
                                     ))}
                                   </div>

@@ -14,6 +14,7 @@ export interface SuggestionItem {
   priority:             'alta' | 'media' | 'baja';
   tipo:                 'core' | 'variante';
   relevancia:           'directa' | 'generica';
+  score:                number;
 }
 
 export interface SuggestKeywordsResponse {
@@ -37,10 +38,32 @@ function priorityTier(avg: number): 'alta' | 'media' | 'baja' {
   return 'baja';
 }
 
-function parseYoy(raw: string | null): number | null {
+function parseChange(raw: string | null): number | null {
   if (!raw) return null;
   const m = raw.match(/-?\d+(\.\d+)?/);
   return m ? parseFloat(m[0]) : null;
+}
+
+// Composite score (0–120+ pts): volume 50% · competition 25% · trend 25% · relevancia bonus
+function computeScore(
+  avg: number,
+  competition: string | null,
+  change_yoy: string | null,
+  change_3m: string | null,
+  relevancia: 'directa' | 'generica',
+): number {
+  const volPts  = avg >= 5000 ? 50 : avg >= 1000 ? 40 : avg >= 500 ? 30 : avg >= 100 ? 20 : 10;
+  const compPts = competition === 'Baja' ? 25 : competition === 'Media' ? 15 : competition === 'Alta' ? 5 : 10;
+
+  const yoy = parseChange(change_yoy);
+  let trendPts = yoy === null ? 15 : yoy >= 0 ? 25 : yoy >= -30 ? 15 : yoy >= -60 ? 5 : 0;
+  const m3 = parseChange(change_3m);
+  if (m3 !== null) {
+    if (m3 > 0)    trendPts += 5;
+    if (m3 <= -50) trendPts -= 5;
+  }
+
+  return volPts + compPts + trendPts + (relevancia === 'directa' ? 20 : 0);
 }
 
 // Build inclusive (propios) and exclusive (excluidos) term sets from the dictionary.
@@ -143,6 +166,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const rawTipo      = searchParams.get('tipo_cable');
   const existingRaw  = searchParams.get('existing_aliases') ?? '';
+  const maxCore      = Math.max(1, parseInt(searchParams.get('max_core')     ?? '10', 10) || 10);
+  const maxVariante  = Math.max(1, parseInt(searchParams.get('max_variante') ?? '8',  10) || 8);
 
   if (!rawTipo) {
     return NextResponse.json({ error: 'tipo_cable requerido' }, { status: 400 });
@@ -176,15 +201,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Build relevance term sets from the cable dictionary
+  // Build relevance term sets from the nomenclature dictionary
   const { propios, excluidos } = buildTerminos(tipo_cable);
 
-  const items: SuggestionItem[] = (data ?? [])
+  // Intermediate type — tipo assigned after scoring sort
+  type ScoredRow = Omit<SuggestionItem, 'tipo'>;
+
+  const scored: ScoredRow[] = (data ?? [])
     .filter((row) => {
-      // Drop already-accepted aliases
       if (existingSet.has((row.keyword as string).toLowerCase())) return false;
-      // Drop keywords in strong year-over-year decline
-      const yoy = parseYoy(row.change_yoy as string | null);
+      const yoy = parseChange(row.change_yoy as string | null);
       if (yoy !== null && yoy <= -50) return false;
       return true;
     })
@@ -192,28 +218,32 @@ export async function GET(request: NextRequest) {
       const keyword = row.keyword as string;
       const { relevant, relevancia } = getRelevancia(keyword, propios, excluidos);
       if (!relevant) return [];
+      const avg   = row.avg_monthly_searches as number;
+      const comp  = row.competition as string | null;
+      const c3m   = row.change_3m as string | null;
+      const cyoy  = row.change_yoy as string | null;
       return [{
         keyword,
-        avg_monthly_searches: row.avg_monthly_searches as number,
-        competition:          row.competition as string | null,
-        change_3m:            row.change_3m as string | null,
-        change_yoy:           row.change_yoy as string | null,
-        priority:             priorityTier(row.avg_monthly_searches as number),
-        tipo:                 classify(keyword),
+        avg_monthly_searches: avg,
+        competition:          comp,
+        change_3m:            c3m,
+        change_yoy:           cyoy,
+        priority:             priorityTier(avg),
         relevancia,
+        score:                computeScore(avg, comp, cyoy, c3m, relevancia),
       }];
     })
-    .sort((a, b) => {
-      // directa before generica, then alta before media before baja, then volume desc
-      if (a.relevancia !== b.relevancia) return a.relevancia === 'directa' ? -1 : 1;
-      const order = { alta: 0, media: 1, baja: 2 };
-      const po    = order[a.priority] - order[b.priority];
-      return po !== 0 ? po : b.avg_monthly_searches - a.avg_monthly_searches;
-    });
+    .sort((a, b) => b.score - a.score);
+
+  // Top 3 by score → always core; rest → CALIBRE_RE decides
+  const items: SuggestionItem[] = scored.map((item, idx) => ({
+    ...item,
+    tipo: idx < 3 ? 'core' : classify(item.keyword),
+  }));
 
   return NextResponse.json({
-    core:              items.filter((s) => s.tipo === 'core'),
-    variante:          items.filter((s) => s.tipo === 'variante'),
+    core:              items.filter((s) => s.tipo === 'core').slice(0, maxCore),
+    variante:          items.filter((s) => s.tipo === 'variante').slice(0, maxVariante),
     total_keywords_db: totalCount ?? 0,
   } satisfies SuggestKeywordsResponse);
 }
