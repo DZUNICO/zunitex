@@ -62,10 +62,10 @@ function SectionHeader({
   );
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({ label, children, tooltip }: { label: string; children: React.ReactNode; tooltip?: string }) {
   return (
     <div className="grid grid-cols-[140px_1fr] gap-2 items-start">
-      <label className="text-xs text-muted-foreground pt-2 leading-tight">{label}</label>
+      <label className="text-xs text-muted-foreground pt-2 leading-tight" title={tooltip}>{label}</label>
       <div>{children}</div>
     </div>
   );
@@ -152,7 +152,7 @@ function VarianteCard({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <FieldRow label="Sección valor">
+        <FieldRow label="Sección">
           <Input
             type="number"
             value={v.seccion?.valor ?? ''}
@@ -215,21 +215,31 @@ function VarianteCard({
             className="h-7 text-xs"
           />
         </FieldRow>
-        <FieldRow label="Ampacidad aire A">
+        <FieldRow
+          label="Corriente máx. aire (A)"
+          tooltip="Sin dato — este cable puede no estar especificado para instalación al aire libre, o el fabricante no incluye este valor en la ficha técnica"
+        >
           <Input
             type="number"
             value={v.performance_electrica?.ampacidad?.aire_a ?? ''}
             onChange={(e) => onUpdateDeep(idx, 'performance_electrica', 'ampacidad', 'aire_a', e.target.value === '' ? null : Number(e.target.value))}
             disabled={disabled}
+            placeholder="—"
+            title="Sin dato — este cable puede no estar especificado para instalación al aire libre, o el fabricante no incluye este valor en la ficha técnica"
             className="h-7 text-xs"
           />
         </FieldRow>
-        <FieldRow label="Ampacidad ducto A">
+        <FieldRow
+          label="Corriente máx. ducto (A)"
+          tooltip="Sin dato — este cable puede no estar especificado para instalación en ducto, o el fabricante no incluye este valor en la ficha técnica"
+        >
           <Input
             type="number"
             value={v.performance_electrica?.ampacidad?.ducto_a ?? ''}
             onChange={(e) => onUpdateDeep(idx, 'performance_electrica', 'ampacidad', 'ducto_a', e.target.value === '' ? null : Number(e.target.value))}
             disabled={disabled}
+            placeholder="—"
+            title="Sin dato — este cable puede no estar especificado para instalación en ducto, o el fabricante no incluye este valor en la ficha técnica"
             className="h-7 text-xs"
           />
         </FieldRow>
@@ -726,7 +736,7 @@ export default function PipelineReviewPage() {
                           className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                         />
                       </FieldRow>
-                      <FieldRow label="Aliases búsqueda">
+                      <FieldRow label="Alias de búsqueda">
                         <div className="space-y-2">
                           <AliasTags
                             aliases={core.aliases_busqueda ?? []}

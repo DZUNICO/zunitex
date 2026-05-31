@@ -23,10 +23,16 @@ export async function GET(request: NextRequest) {
   }
 
   // ── 2. Consultar pipeline_candidatos ────────────────────────────────────
-  const { data, error } = await getPipelineClient()
+  const statusFilter = request.nextUrl.searchParams.get('status');
+
+  let query = getPipelineClient()
     .from('pipeline_candidatos')
     .select('id, created_at, pdf_filename, fabricante, tipo_cable, status, confidence_score, notas, raw_json')
     .order('created_at', { ascending: false });
+
+  if (statusFilter) query = query.eq('status', statusFilter);
+
+  const { data, error } = await query;
 
   if (error) {
     return errorResponse(`Error al consultar candidatos: ${error.message}`, 500);

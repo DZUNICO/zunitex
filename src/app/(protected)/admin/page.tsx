@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { FileText, Building2, Settings } from 'lucide-react';
+import { FileText, Building2, Settings, DatabaseZap } from 'lucide-react';
 
 interface QuickLink {
   icon: React.ElementType;
@@ -36,7 +37,9 @@ function QuickLinkCard({ icon: Icon, title, description, href, badge }: QuickLin
 }
 
 export default function AdminPage() {
-  const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const { user } = useAuth();
+  const [pendingCount,         setPendingCount]         = useState<number | null>(null);
+  const [pipelinePendingCount, setPipelinePendingCount] = useState<number | null>(null);
 
   useEffect(() => {
     const q = query(
@@ -48,7 +51,28 @@ export default function AdminPage() {
       .catch(() => setPendingCount(null));
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    user.getIdToken().then((token) =>
+      fetch('/api/pipeline/candidates?status=pending', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then((d: { candidatos?: { id: string }[] }) =>
+          setPipelinePendingCount(d.candidatos?.length ?? 0)
+        )
+        .catch(() => setPipelinePendingCount(null))
+    );
+  }, [user]);
+
   const links: QuickLink[] = [
+    {
+      icon: DatabaseZap,
+      title: 'Pipeline de Datos',
+      description: 'Extracción e ingesta de fichas técnicas con IA',
+      href: '/admin/pipeline',
+      badge: pipelinePendingCount,
+    },
     {
       icon: FileText,
       title: 'Blog',
