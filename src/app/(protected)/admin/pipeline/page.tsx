@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter }                                  from 'next/navigation';
+import Link                                           from 'next/link';
 import { useAuth }                                    from '@/lib/context/auth-context';
 import { AdminRoute }                                 from '@/components/shared/admin-route';
 import { Card, CardContent, CardHeader, CardTitle }   from '@/components/ui/card';
@@ -26,6 +27,7 @@ import {
   XCircle,
   Cpu,
   AlertTriangle,
+  BarChart2,
 } from 'lucide-react';
 import type { PipelineStatus } from '@/lib/pipeline/types';
 
@@ -481,17 +483,25 @@ export default function AdminPipelinePage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Candidatos</h2>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={fetchCandidatos}
-              disabled={loadingList}
-            >
-              {loadingList
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : 'Actualizar'
-              }
-            </Button>
+            <div className="flex items-center gap-2">
+              <Link href="/admin/pipeline/keywords">
+                <Button size="sm" variant="ghost" className="text-muted-foreground gap-1.5">
+                  <BarChart2 className="h-3.5 w-3.5" />
+                  Keywords
+                </Button>
+              </Link>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={fetchCandidatos}
+                disabled={loadingList}
+              >
+                {loadingList
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : 'Actualizar'
+                }
+              </Button>
+            </div>
           </div>
 
           {loadingList ? (

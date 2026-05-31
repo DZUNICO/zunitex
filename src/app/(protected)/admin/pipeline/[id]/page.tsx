@@ -13,10 +13,11 @@ import { useToast }                                   from '@/hooks/use-toast';
 import {
   Loader2, FileText, ChevronDown, ChevronRight,
   X, Plus, CheckCircle2, AlertTriangle, Save,
-  ThumbsUp, ThumbsDown, ArrowLeft, Sparkles, Check,
+  ThumbsUp, ThumbsDown, ArrowLeft, Tags, Check,
 } from 'lucide-react';
+import Link from 'next/link';
 import type { ExtraccionResult, Variante, PipelineCandidato } from '@/lib/pipeline/types';
-import type { AliasSuggestion, SuggestAliasesResponse }       from '@/app/api/pipeline/suggest-aliases/route';
+import type { SuggestKeywordsResponse }                       from '@/app/api/pipeline/keywords/suggest/route';
 
 // ── Small helpers ──────────────────────────────────────────────────────────────
 
@@ -303,10 +304,11 @@ export default function PipelineReviewPage() {
   type ActionState = 'idle' | 'approving' | 'rejecting';
   const [actionState, setActionState] = useState<ActionState>('idle');
 
-  // ── Alias bot state ────────────────────────────────────────────────────────
-  const [botLoading,      setBotLoading]      = useState(false);
-  const [botSuggestions,  setBotSuggestions]  = useState<SuggestAliasesResponse | null>(null);
-  const [acceptedAliases, setAcceptedAliases] = useState<Set<string>>(new Set());
+  // ── Keyword suggestions state ──────────────────────────────────────────────
+  const [kwLoading,     setKwLoading]     = useState(false);
+  const [kwSuggestions, setKwSuggestions] = useState<SuggestKeywordsResponse | null>(null);
+  const [kwError,       setKwError]       = useState<string | null>(null);
+  const [acceptedKw,    setAcceptedKw]    = useState<Set<string>>(new Set());
 
   // ── Fetch candidato ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -456,64 +458,45 @@ export default function PipelineReviewPage() {
     }
   }
 
-  async function handleSuggestAliases() {
+  async function fetchSuggestions() {
     if (!user || !json) return;
-    setBotLoading(true);
-    setBotSuggestions(null);
-    setAcceptedAliases(new Set());
+    setKwLoading(true);
+    setKwSuggestions(null);
+    setKwError(null);
+    setAcceptedKw(new Set());
     try {
-      const token = await user.getIdToken();
-      const res   = await fetch('/api/pipeline/suggest-aliases', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ edited_json: json, raw_json: candidato?.raw_json }),
-      });
-      const data = await res.json() as SuggestAliasesResponse & { error?: string };
+      const token    = await user.getIdToken();
+      const tipo     = encodeURIComponent(core?.tipo_cable ?? '');
+      const existing = encodeURIComponent((core?.aliases_busqueda ?? []).join(','));
+      const res      = await fetch(
+        `/api/pipeline/keywords/suggest?tipo_cable=${tipo}&existing_aliases=${existing}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const data = await res.json() as SuggestKeywordsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setBotSuggestions(data);
+      setKwSuggestions(data);
     } catch (err) {
-      toast({ title: 'Error al sugerir aliases', description: (err as Error).message, variant: 'destructive' });
+      setKwError((err as Error).message);
     } finally {
-      setBotLoading(false);
+      setKwLoading(false);
     }
   }
 
-  function acceptAlias(suggestion: AliasSuggestion) {
+  function acceptKw(keyword: string) {
     if (!json) return;
     const current = core?.aliases_busqueda ?? [];
-    if (current.includes(suggestion.alias)) return;
-    const next = [...current, suggestion.alias];
-    updateCore('aliases_busqueda', next);
-    setAcceptedAliases((prev) => new Set([...prev, suggestion.alias]));
+    if (current.includes(keyword)) return;
+    updateCore('aliases_busqueda', [...current, keyword]);
+    setAcceptedKw((prev) => new Set([...prev, keyword]));
   }
 
-  function acceptAllCoreAliases() {
-    if (!json || !botSuggestions) return;
+  function acceptAllCoreKw() {
+    if (!json || !kwSuggestions) return;
     const current = core?.aliases_busqueda ?? [];
-    const toAdd   = botSuggestions.aliases_core
-      .map((s) => s.alias)
-      .filter((a) => !current.includes(a));
+    const toAdd   = kwSuggestions.core.map((s) => s.keyword).filter((k) => !current.includes(k));
     if (toAdd.length === 0) return;
-    const next = [...current, ...toAdd];
-    updateCore('aliases_busqueda', next);
-    setAcceptedAliases((prev) => new Set([...prev, ...toAdd]));
-  }
-
-  function eliminateAlias(suggestion: AliasSuggestion) {
-    if (!json) return;
-    const current = core?.aliases_busqueda ?? [];
-    const next    = current.filter((a) => a !== suggestion.alias);
-    updateCore('aliases_busqueda', next);
-    setAcceptedAliases((prev) => new Set([...prev, suggestion.alias]));
-  }
-
-  function eliminateAllSuggested() {
-    if (!json || !botSuggestions) return;
-    const toRemove = new Set(botSuggestions.aliases_eliminar.map((s) => s.alias));
-    const current  = core?.aliases_busqueda ?? [];
-    const next     = current.filter((a) => !toRemove.has(a));
-    updateCore('aliases_busqueda', next);
-    setAcceptedAliases((prev) => new Set([...prev, ...toRemove]));
+    updateCore('aliases_busqueda', [...current, ...toAdd]);
+    setAcceptedKw((prev) => new Set([...prev, ...toAdd]));
   }
 
   function toggleSection(s: keyof typeof sections) {
@@ -748,61 +731,78 @@ export default function PipelineReviewPage() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={handleSuggestAliases}
-                              disabled={busy || botLoading || !json}
-                              className="h-7 text-xs border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950"
+                              onClick={fetchSuggestions}
+                              disabled={busy || kwLoading || !json || !core?.tipo_cable}
+                              className="h-7 text-xs"
                             >
-                              {botLoading
+                              {kwLoading
                                 ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                : <Sparkles className="h-3 w-3 mr-1" />}
-                              Sugerir aliases con IA
+                                : <Tags className="h-3 w-3 mr-1" />}
+                              Sugerir aliases
                             </Button>
                           )}
 
-                          {botSuggestions && (
-                            <div className="rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-950/20 p-3 space-y-3">
-                              <p className="text-xs text-violet-700 dark:text-violet-400 italic">
-                                {botSuggestions.resumen}
+                          {kwError && (
+                            <p className="text-xs text-destructive">{kwError}</p>
+                          )}
+
+                          {kwSuggestions && kwSuggestions.total_keywords_db === 0 && (
+                            <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground space-y-1">
+                              <p>No hay keywords cargadas para <strong>{core?.tipo_cable}</strong>.</p>
+                              <Link href="/admin/pipeline/keywords" className="text-primary underline">
+                                Gestionar keywords SEO →
+                              </Link>
+                            </div>
+                          )}
+
+                          {kwSuggestions && kwSuggestions.total_keywords_db > 0 && (
+                            <div className="rounded-lg border p-3 space-y-3">
+                              <p className="text-xs text-muted-foreground">
+                                {kwSuggestions.total_keywords_db.toLocaleString()} keywords en base de datos
                               </p>
 
-                              {/* CORE aliases — violet chips, clickable */}
-                              {botSuggestions.aliases_core.length > 0 && (
+                              {kwSuggestions.core.length > 0 && (
                                 <div className="space-y-1.5">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-violet-800 dark:text-violet-300">
-                                      Agregar al Core ({botSuggestions.aliases_core.length})
-                                    </span>
+                                    <span className="text-xs font-medium">Core ({kwSuggestions.core.length})</span>
                                     {!isDone && (
                                       <button
                                         type="button"
-                                        onClick={acceptAllCoreAliases}
-                                        className="text-xs text-violet-600 hover:text-violet-800 dark:text-violet-400 underline"
+                                        onClick={acceptAllCoreKw}
+                                        className="text-xs text-primary underline"
                                       >
                                         Aceptar todos
                                       </button>
                                     )}
                                   </div>
                                   <div className="flex flex-wrap gap-1.5">
-                                    {botSuggestions.aliases_core.map((s, i) => {
-                                      const accepted = acceptedAliases.has(s.alias);
+                                    {kwSuggestions.core.map((s, i) => {
+                                      const already = (core?.aliases_busqueda ?? []).includes(s.keyword) || acceptedKw.has(s.keyword);
+                                      const colorCls = s.priority === 'alta'
+                                        ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700'
+                                        : s.priority === 'media'
+                                          ? 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700'
+                                          : 'bg-muted text-muted-foreground border-border';
                                       return (
                                         <button
                                           key={i}
                                           type="button"
-                                          title={s.razon}
-                                          onClick={() => !isDone && acceptAlias(s)}
-                                          disabled={isDone || accepted}
+                                          title={`${s.avg_monthly_searches.toLocaleString()} búsq/mes · ${s.competition ?? '—'} competencia`}
+                                          onClick={() => !isDone && !already && acceptKw(s.keyword)}
+                                          disabled={isDone || already}
                                           className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border transition-colors ${
-                                            accepted
-                                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700'
-                                              : 'bg-violet-100 text-violet-800 border-violet-300 hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700 dark:hover:bg-violet-900/50'
+                                            already
+                                              ? 'bg-muted text-muted-foreground border-border opacity-50 cursor-default'
+                                              : `${colorCls} hover:opacity-80 cursor-pointer`
                                           }`}
                                         >
-                                          {accepted ? <Check className="h-2.5 w-2.5" /> : <Plus className="h-2.5 w-2.5" />}
-                                          {s.alias}
-                                          {s.volumen !== 'desconocido' && (
-                                            <span className="opacity-60 ml-0.5">{s.volumen === 'alto' ? '↑↑' : s.volumen === 'medio' ? '↑' : '↓'}</span>
-                                          )}
+                                          {already ? <Check className="h-2.5 w-2.5" /> : <Plus className="h-2.5 w-2.5" />}
+                                          {s.keyword}
+                                          <span className="opacity-60 text-[10px]">
+                                            {s.avg_monthly_searches >= 1000
+                                              ? `${(s.avg_monthly_searches / 1000).toFixed(0)}k`
+                                              : s.avg_monthly_searches}
+                                          </span>
                                         </button>
                                       );
                                     })}
@@ -810,66 +810,34 @@ export default function PipelineReviewPage() {
                                 </div>
                               )}
 
-                              {/* VARIANTE aliases — amber info only */}
-                              {botSuggestions.aliases_variante.length > 0 && (
+                              {kwSuggestions.variante.length > 0 && (
                                 <div className="space-y-1.5">
                                   <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                                    Info por variante (solo referencia)
+                                    Por variante — solo referencia ({kwSuggestions.variante.length})
                                   </span>
                                   <div className="flex flex-wrap gap-1.5">
-                                    {botSuggestions.aliases_variante.map((s, i) => (
+                                    {kwSuggestions.variante.map((s, i) => (
                                       <span
                                         key={i}
-                                        title={s.razon}
+                                        title={`${s.avg_monthly_searches.toLocaleString()} búsq/mes · ${s.competition ?? '—'} competencia`}
                                         className="inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700"
                                       >
-                                        {s.alias}
+                                        {s.keyword}
+                                        <span className="opacity-60 text-[10px]">
+                                          {s.avg_monthly_searches >= 1000
+                                            ? `${(s.avg_monthly_searches / 1000).toFixed(0)}k`
+                                            : s.avg_monthly_searches}
+                                        </span>
                                       </span>
                                     ))}
                                   </div>
                                 </div>
                               )}
 
-                              {/* ELIMINAR aliases — red strikethrough */}
-                              {botSuggestions.aliases_eliminar.length > 0 && (
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-red-700 dark:text-red-400">
-                                      Sugeridos para eliminar ({botSuggestions.aliases_eliminar.length})
-                                    </span>
-                                    {!isDone && (
-                                      <button
-                                        type="button"
-                                        onClick={eliminateAllSuggested}
-                                        className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 underline"
-                                      >
-                                        Eliminar todos
-                                      </button>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {botSuggestions.aliases_eliminar.map((s, i) => {
-                                      const done = acceptedAliases.has(s.alias);
-                                      return (
-                                        <button
-                                          key={i}
-                                          type="button"
-                                          title={s.razon}
-                                          onClick={() => !isDone && eliminateAlias(s)}
-                                          disabled={isDone || done}
-                                          className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border transition-colors ${
-                                            done
-                                              ? 'bg-muted text-muted-foreground border-border line-through opacity-50'
-                                              : 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 dark:hover:bg-red-900/40'
-                                          }`}
-                                        >
-                                          <X className="h-2.5 w-2.5" />
-                                          <span className={done ? 'line-through' : ''}>{s.alias}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
+                              {kwSuggestions.core.length === 0 && kwSuggestions.variante.length === 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                  No hay sugerencias — todas ya incluidas o filtradas.
+                                </p>
                               )}
                             </div>
                           )}

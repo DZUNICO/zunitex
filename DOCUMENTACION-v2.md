@@ -170,6 +170,52 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ## 📋 REGISTRO DE CAMBIOS
 
+### [2026-05-31] — Rediseño sistema sugerencias de aliases SEO: de IA a keywords reales
+
+**Problema resuelto:**
+- El bot de sugerencias de aliases usaba Claude (costo variable, latencia 15–30s, inventaba aliases sin respaldo de datos).
+- Reemplazado por sugerencias basadas en datos reales de Google Keyword Planner (cero costo de IA, resultados en <1s).
+
+**Cambios realizados:**
+
+- `src/app/api/pipeline/keywords/upload/route.ts` — **NUEVO**. GET: estadísticas agrupadas por tipo_cable. POST: recibe `{csv_text, tipo_cable}`, parsea CSV UTF-16 de Google KWP (skip 3 headers, tab-separated, range-aware `parseAvgSearches`), upsert a `keyword_stats` con `onConflict: 'keyword,tipo_cable'`.
+- `src/app/api/pipeline/keywords/suggest/route.ts` — **NUEVO**. GET `?tipo_cable=X&existing_aliases=a,b`. Filtra `avg_monthly_searches ≥ 50`, excluye existing, excluye `change_yoy ≤ -50%`. Clasifica `core`/`variante` con `CALIBRE_RE`. Exporta `SuggestionItem` y `SuggestKeywordsResponse`.
+- `src/app/(protected)/admin/pipeline/keywords/page.tsx` — **NUEVO**. Tabla de stats (tipo, count, última carga). Dialog de subida con Select + file input. BOM detection UTF-16 en cliente.
+- `src/app/api/pipeline/suggest-aliases/route.ts` — **ELIMINADO** (bot de IA Claude).
+- `src/app/(protected)/admin/pipeline/[id]/page.tsx` — Eliminados: imports `AliasSuggestion`, `SuggestAliasesResponse`, `Sparkles`. Estados y funciones del bot (`botLoading`, `botSuggestions`, `acceptedAliases`, `handleSuggestAliases`, `acceptAlias`, `acceptAllCoreAliases`, `eliminateAlias`, `eliminateAllSuggested`). Reemplazados con: estado kw (`kwLoading`, `kwSuggestions`, `kwError`, `acceptedKw`), funciones `fetchSuggestions()`, `acceptKw()`, `acceptAllCoreKw()`. UI rediseñada con chips verde/amarillo/gris por prioridad + sección amber para variantes. Link a `/admin/pipeline/keywords` si no hay datos cargados.
+- `src/app/(protected)/admin/pipeline/page.tsx` — Agrega botón "Keywords" (BarChart2 icon) junto al botón "Actualizar" → `/admin/pipeline/keywords`.
+- `src/app/(protected)/admin/page.tsx` — Nueva card "Keywords SEO" (BarChart2, href `/admin/pipeline/keywords`) en el grid del panel admin.
+- `DOCUMENTACION-v2.md` — Actualizado: tabla `keyword_stats`, rutas `/api/pipeline/keywords/upload` y `suggest`, páginas admin, eliminada documentación de `suggest-aliases`.
+
+**Archivos creados:**
+- `src/app/api/pipeline/keywords/upload/route.ts`
+- `src/app/api/pipeline/keywords/suggest/route.ts`
+- `src/app/(protected)/admin/pipeline/keywords/page.tsx`
+
+**Archivos eliminados:**
+- `src/app/api/pipeline/suggest-aliases/route.ts`
+
+**Tabla Supabase nueva requerida:**
+```sql
+CREATE TABLE keyword_stats (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  keyword TEXT NOT NULL, tipo_cable TEXT NOT NULL,
+  avg_monthly_searches INTEGER, competition TEXT,
+  change_3m TEXT, change_yoy TEXT,
+  uploaded_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (keyword, tipo_cable)
+);
+CREATE INDEX idx_keyword_stats_tipo_cable ON keyword_stats (tipo_cable);
+CREATE INDEX idx_keyword_stats_volume ON keyword_stats (tipo_cable, avg_monthly_searches DESC);
+```
+
+**Testing realizado:**
+- ✅ `npm run build` exitoso — 39 rutas generadas, 0 errores. Rutas nuevas: `/admin/pipeline/keywords`, `/api/pipeline/keywords/suggest`, `/api/pipeline/keywords/upload`.
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-12] — Paginación comunidad verificada, error boundaries, types, image sizes
 
 **Cambios realizados:**
@@ -2873,6 +2919,58 @@ RLS habilitado sin políticas — solo accesible con service key (server-side).
 
 ---
 
+### Supabase — Tabla `keyword_stats`
+
+Tabla en el proyecto **STARLOGIC-CATALOGO** (misma instancia que `pipeline_candidatos`).  
+Almacena datos de Google Keyword Planner para sugerir aliases SEO sin usar IA.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | uuid PK | Auto-generado |
+| `keyword` | text NOT NULL | Keyword en minúsculas (normalizada al insertar) |
+| `tipo_cable` | text NOT NULL | Clave normalizada del `CABLE_NOMENCLATURE` (ej: `TW-80`, `NH`) |
+| `avg_monthly_searches` | integer | Promedio de búsquedas mensuales. Rangos como "100 - 1,000" → lower bound (100) |
+| `competition` | text NULL | Valor de competencia del KWP (Low / Medium / High) |
+| `change_3m` | text NULL | Cambio 3 meses (ej: "5%") |
+| `change_yoy` | text NULL | Cambio año contra año (ej: "-30%") |
+| `uploaded_at` | timestamptz | Timestamp de última actualización de esta fila |
+
+**Constraint UNIQUE:** `(keyword, tipo_cable)` — upsert con `onConflict: 'keyword,tipo_cable'`
+
+**Índices:**
+- `idx_keyword_stats_tipo_cable` ON `tipo_cable`
+- `idx_keyword_stats_volume` ON `tipo_cable, avg_monthly_searches DESC`
+
+**SQL de creación:**
+```sql
+CREATE TABLE keyword_stats (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  keyword              TEXT NOT NULL,
+  tipo_cable           TEXT NOT NULL,
+  avg_monthly_searches INTEGER,
+  competition          TEXT,
+  change_3m            TEXT,
+  change_yoy           TEXT,
+  uploaded_at          TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (keyword, tipo_cable)
+);
+CREATE INDEX idx_keyword_stats_tipo_cable ON keyword_stats (tipo_cable);
+CREATE INDEX idx_keyword_stats_volume ON keyword_stats (tipo_cable, avg_monthly_searches DESC);
+```
+
+**Flujo de carga:**
+1. Admin va a `/admin/pipeline/keywords` → botón "Subir CSV"
+2. Selecciona tipo de cable + archivo CSV (Google KWP export UTF-16 LE, tab-separated)
+3. Cliente lee CSV como ArrayBuffer, detecta BOM UTF-16, decodifica con `TextDecoder`
+4. POST `/api/pipeline/keywords/upload` → parsea CSV (skip 3 header rows), upsert
+
+**Clasificación de suggestions:**
+- `CALIBRE_RE` — keywords con número de calibre (14, 12, 2.5, 4mm, AWG, mm2, etc.) → `variante`
+- Sin calibre → `core` (van a `PRODUCTO_CORE.aliases_busqueda`)
+- `priority` = `alta` si avg ≥ 500, `media` si ≥ 100, `baja` si ≥ 50 (mínimo para aparecer)
+
+---
+
 ### Archivos creados
 
 #### Librerías internas (`src/lib/pipeline/`)
@@ -2904,28 +3002,32 @@ Todas requieren `Authorization: Bearer {firebase_id_token}` de usuario con claim
 | PATCH | `/api/pipeline/candidates/[id]` | Auto-save del editor: actualiza `edited_json` y/o `notas` | `{ saved: true }` |
 | POST | `/api/pipeline/reject` | Marca candidato como `rejected`. Solo actúa si `status='pending'`. Registra `reviewed_by` + `reviewed_at` | `{ rejected: true }` |
 | POST | `/api/pipeline/approve` | Mapea `PRODUCTO_CORE` → `productos_catalogo`, embebe `VARIANTES` en `atributos.variantes`, inserta con `disponible_peru=false`. Marca candidato `approved` con `producto_id` | `{ producto_id, approved: true }` |
-| POST | `/api/pipeline/suggest-aliases` | Recibe `{ edited_json, raw_json }`, detecta tipo de cable y carga sus aliases del `CABLE_NOMENCLATURE`, llama a Claude para generar sugerencias SEO segmentadas en 3 grupos | `SuggestAliasesResponse` |
+| GET | `/api/pipeline/keywords/upload` | Devuelve estadísticas de keywords cargadas agrupadas por tipo de cable | `{ stats: KeywordStat[] }` |
+| POST | `/api/pipeline/keywords/upload` | Recibe `{ csv_text, tipo_cable }` (UTF-16 ya decodificado en cliente). Parsea CSV de Google Keyword Planner (skip 3 headers, tab-separated). Upsert a `keyword_stats` con `onConflict: 'keyword,tipo_cable'` | `{ inserted, updated, errors[] }` |
+| GET | `/api/pipeline/keywords/suggest` | Recibe `?tipo_cable=X&existing_aliases=a,b,c`. Filtra `avg_monthly_searches ≥ 50`, excluye existing, excluye `change_yoy ≤ -50%`. Clasifica `core` vs `variante` con `CALIBRE_RE` | `SuggestKeywordsResponse` |
 
-**`/api/pipeline/suggest-aliases` — Body y Respuesta:**
+**`/api/pipeline/keywords/suggest` — Query params y Respuesta:**
 
 ```typescript
-// Request body
-{ edited_json?: ExtraccionResult; raw_json?: ExtraccionResult }
+// Query params
+?tipo_cable=TW-80&existing_aliases=cable+tw,cable+electrico
 
-// Response (SuggestAliasesResponse — exportado desde la ruta)
+// Response (SuggestKeywordsResponse — exportado desde la ruta)
 {
-  aliases_core:     AliasSuggestion[];  // sugeridos para PRODUCTO_CORE.aliases_busqueda
-  aliases_variante: AliasSuggestion[];  // info por calibre específico, solo lectura
-  aliases_eliminar: AliasSuggestion[];  // aliases actuales incorrectos o irrelevantes
-  resumen:          string;             // frase breve con oportunidades SEO
+  core:              SuggestionItem[];  // keywords sin calibre específico
+  variante:          SuggestionItem[];  // keywords con calibre (14 AWG, 2.5 mm2, etc.)
+  total_keywords_db: number;           // total en BD para este tipo; 0 = no cargadas
 }
 
-// AliasSuggestion (exportado desde la ruta)
+// SuggestionItem (exportado desde la ruta)
 {
-  alias:   string;
-  volumen: 'alto' | 'medio' | 'bajo' | 'desconocido';
-  tipo:    'agregar_core' | 'agregar_variante' | 'eliminar';
-  razon:   string;
+  keyword:              string;
+  avg_monthly_searches: number;
+  competition:          string | null;
+  change_3m:            string | null;
+  change_yoy:           string | null;
+  priority:             'alta' | 'media' | 'baja';  // alta ≥500, media ≥100, baja ≥50
+  tipo:                 'core' | 'variante';
 }
 ```
 
@@ -2943,8 +3045,9 @@ Todas requieren `Authorization: Bearer {firebase_id_token}` de usuario con claim
 
 | Ruta | Archivo | Descripción |
 |---|---|---|
-| `/admin/pipeline` | `src/app/(protected)/admin/pipeline/page.tsx` | Lista de candidatos con tabs Pendientes / Aprobados / Rechazados. Formulario de subida de PDF con progress indicator de 3 fases. Confidence badges con color. |
-| `/admin/pipeline/[id]` | `src/app/(protected)/admin/pipeline/[id]/page.tsx` | Review Interface: split view PDF (iframe) + editor estructurado con secciones colapsables (Core, Variantes, Quality, Notas). Auto-save debounce 2s. Botones Rechazar / Aprobar e Insertar. **Bot de aliases SEO**: botón "Sugerir aliases con IA" (violeta) bajo el campo Aliases búsqueda; panel con 3 secciones (CORE chips clickeables, VARIANTE info amber, ELIMINAR chips rojos). |
+| `/admin/pipeline` | `src/app/(protected)/admin/pipeline/page.tsx` | Lista de candidatos con tabs Pendientes / Aprobados / Rechazados. Formulario de subida de PDF con progress indicator de 3 fases. Confidence badges con color. Botón "Keywords" en header de Candidatos → `/admin/pipeline/keywords`. |
+| `/admin/pipeline/[id]` | `src/app/(protected)/admin/pipeline/[id]/page.tsx` | Review Interface: split view PDF (iframe) + editor estructurado con secciones colapsables (Core, Variantes, Quality, Notas). Auto-save debounce 2s. Botones Rechazar / Aprobar e Insertar. **Sugerencias keywords SEO** (sin IA): botón "Sugerir aliases" (Tags icon) bajo el campo "Alias de búsqueda"; llama a GET `/api/pipeline/keywords/suggest`. Panel: keywords core (chips clickeables con prioridad por color verde/amarillo/gris) + keywords variante (amber, solo referencia). Si no hay keywords cargadas para el tipo, muestra link a gestión. |
+| `/admin/pipeline/keywords` | `src/app/(protected)/admin/pipeline/keywords/page.tsx` | Gestión de keywords de Google Keyword Planner. Tabla con tipo de cable, count, última carga. Botón "Subir CSV" abre Dialog con Select de tipo + input de archivo. Lee CSV como UTF-16 en el cliente (BOM detection). Envía texto decodificado al POST `/api/pipeline/keywords/upload`. |
 | `/admin/pipeline/test-token` | `src/app/(protected)/admin/pipeline/test-token/page.tsx` | **Solo desarrollo local.** Muestra el Firebase ID token del usuario actual para testing de APIs. Eliminar en producción. |
 
 ---

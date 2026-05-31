@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { FileText, Building2, Settings, DatabaseZap } from 'lucide-react';
+import { FileText, Building2, Settings, DatabaseZap, BarChart2 } from 'lucide-react';
 
 interface QuickLink {
   icon: React.ElementType;
@@ -72,6 +72,12 @@ export default function AdminPage() {
       description: 'Extracción e ingesta de fichas técnicas con IA',
       href: '/admin/pipeline',
       badge: pipelinePendingCount,
+    },
+    {
+      icon: BarChart2,
+      title: 'Keywords SEO',
+      description: 'Keywords de Google Keyword Planner por tipo de cable',
+      href: '/admin/pipeline/keywords',
     },
     {
       icon: FileText,
