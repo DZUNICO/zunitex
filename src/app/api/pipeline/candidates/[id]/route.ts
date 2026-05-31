@@ -54,8 +54,15 @@ export async function PATCH(
   }
 
   const patch: Record<string, unknown> = {};
-  if ('edited_json' in body) patch.edited_json = body.edited_json;
-  if ('notas'       in body) patch.notas       = body.notas;
+  if ('edited_json' in body) {
+    patch.edited_json = body.edited_json;
+    const tipoCable = (body.edited_json as { PRODUCTO_CORE?: { tipo_cable?: unknown } } | null)
+      ?.PRODUCTO_CORE?.tipo_cable;
+    if (typeof tipoCable === 'string' && tipoCable.trim()) {
+      patch.tipo_cable = tipoCable.trim();
+    }
+  }
+  if ('notas' in body) patch.notas = body.notas;
 
   if (Object.keys(patch).length === 0) {
     return errorResponse('Nada que actualizar', 400);
