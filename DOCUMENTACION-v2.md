@@ -2904,6 +2904,30 @@ Todas requieren `Authorization: Bearer {firebase_id_token}` de usuario con claim
 | PATCH | `/api/pipeline/candidates/[id]` | Auto-save del editor: actualiza `edited_json` y/o `notas` | `{ saved: true }` |
 | POST | `/api/pipeline/reject` | Marca candidato como `rejected`. Solo actúa si `status='pending'`. Registra `reviewed_by` + `reviewed_at` | `{ rejected: true }` |
 | POST | `/api/pipeline/approve` | Mapea `PRODUCTO_CORE` → `productos_catalogo`, embebe `VARIANTES` en `atributos.variantes`, inserta con `disponible_peru=false`. Marca candidato `approved` con `producto_id` | `{ producto_id, approved: true }` |
+| POST | `/api/pipeline/suggest-aliases` | Recibe `{ edited_json, raw_json }`, detecta tipo de cable y carga sus aliases del `CABLE_NOMENCLATURE`, llama a Claude para generar sugerencias SEO segmentadas en 3 grupos | `SuggestAliasesResponse` |
+
+**`/api/pipeline/suggest-aliases` — Body y Respuesta:**
+
+```typescript
+// Request body
+{ edited_json?: ExtraccionResult; raw_json?: ExtraccionResult }
+
+// Response (SuggestAliasesResponse — exportado desde la ruta)
+{
+  aliases_core:     AliasSuggestion[];  // sugeridos para PRODUCTO_CORE.aliases_busqueda
+  aliases_variante: AliasSuggestion[];  // info por calibre específico, solo lectura
+  aliases_eliminar: AliasSuggestion[];  // aliases actuales incorrectos o irrelevantes
+  resumen:          string;             // frase breve con oportunidades SEO
+}
+
+// AliasSuggestion (exportado desde la ruta)
+{
+  alias:   string;
+  volumen: 'alto' | 'medio' | 'bajo' | 'desconocido';
+  tipo:    'agregar_core' | 'agregar_variante' | 'eliminar';
+  razon:   string;
+}
+```
 
 **Campos del formulario en `/api/pipeline/extract` (multipart/form-data):**
 
@@ -2920,7 +2944,7 @@ Todas requieren `Authorization: Bearer {firebase_id_token}` de usuario con claim
 | Ruta | Archivo | Descripción |
 |---|---|---|
 | `/admin/pipeline` | `src/app/(protected)/admin/pipeline/page.tsx` | Lista de candidatos con tabs Pendientes / Aprobados / Rechazados. Formulario de subida de PDF con progress indicator de 3 fases. Confidence badges con color. |
-| `/admin/pipeline/[id]` | `src/app/(protected)/admin/pipeline/[id]/page.tsx` | Review Interface: split view PDF (iframe) + editor estructurado con secciones colapsables (Core, Variantes, Quality, Notas). Auto-save debounce 2s. Botones Rechazar / Aprobar e Insertar. |
+| `/admin/pipeline/[id]` | `src/app/(protected)/admin/pipeline/[id]/page.tsx` | Review Interface: split view PDF (iframe) + editor estructurado con secciones colapsables (Core, Variantes, Quality, Notas). Auto-save debounce 2s. Botones Rechazar / Aprobar e Insertar. **Bot de aliases SEO**: botón "Sugerir aliases con IA" (violeta) bajo el campo Aliases búsqueda; panel con 3 secciones (CORE chips clickeables, VARIANTE info amber, ELIMINAR chips rojos). |
 | `/admin/pipeline/test-token` | `src/app/(protected)/admin/pipeline/test-token/page.tsx` | **Solo desarrollo local.** Muestra el Firebase ID token del usuario actual para testing de APIs. Eliminar en producción. |
 
 ---
@@ -3085,6 +3109,9 @@ Si Claude devuelve JSON no parseable, el sistema igualmente inserta el candidato
 **Auto-save con debounce de 2 segundos.**  
 Cada cambio en el editor de la Review Interface programa un PATCH a `/api/pipeline/candidates/[id]` con delay de 2s. Si el operador aprueba o rechaza antes de que se ejecute, el save se hace síncronamente antes de la acción. El operador nunca pierde cambios.
 
+**Bot de aliases SEO separado del auto-save.**  
+El bot de sugerencias (`suggest-aliases`) es una llamada on-demand — no está integrado al flujo de auto-save. Cuando el operador acepta un alias sugerido, ese alias se agrega al array `aliases_busqueda` del JSON en estado, lo que sí dispara el auto-save normalmente. El estado del bot (`botSuggestions`, `acceptedAliases`) es local a la sesión — no se persiste; si el operador recarga la página, los chips desaparecen pero los aliases aceptados ya están guardados en `edited_json`.
+
 ---
 
 ### Dependencias nuevas
@@ -3110,5 +3137,6 @@ npm install @anthropic-ai/sdk
 | `ad59348` | feat: pipeline paso 6 — review interface + APIs de aprobación y rechazo |
 | `1a32a52` | fix: modelo Claude correcto (claude-sonnet-4-5) + página test-token |
 | `a66ed0e` | feat: diccionario de nomenclatura de cables + normalización en pipeline |
+| *(próximo)* | feat: bot de sugerencias de aliases SEO en review interface |
 3. Analizar performance en Vercel Analytics
 4. Implementar mejoras según feedback de usuarios
