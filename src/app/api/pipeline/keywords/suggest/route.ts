@@ -70,6 +70,33 @@ function buildTerminos(tipoCable: string): { propios: string[]; excluidos: strin
   return { propios: dedup(propios), excluidos: dedup(excluidos) };
 }
 
+// Brand/price terms that are universally relevant — skip all type-specific checks
+const GENERIC_BRAND_TERMS = new Set([
+  'cable indeco', 'cables indeco precios', 'indeco by nexans',
+  'indeco nexans', 'precio cable indeco', 'precio de cable indeco',
+  'sodimac cable indeco', 'promart cable indeco', 'maestro cable indeco',
+  'cables electricos indeco precios', 'cables electricos indeco',
+  'cables eléctricos indeco', 'indeco cables precios',
+  'indeco precios de cables', 'precio de cables electricos indeco',
+  'ficha tecnica de cables indeco', 'cables indeco ficha tecnica',
+  'amperaje de cables indeco', 'amperaje de cables electricos indeco',
+  'tipos de cable indeco', 'tipos de cables indeco',
+  'tipos de cable electrico indeco', 'awg a mm2 indeco',
+  'cables indeco amperaje', 'indeco cable',
+]);
+
+// Cable-type nouns not yet in CABLE_NOMENCLATURE — block them as foreign-type noise
+// Sorted longest-first so multi-word phrases match before their sub-terms
+const GENERIC_BLOCKERS = [
+  'libre de halogeno', 'puesta a tierra', 'autosoportado',
+  'autoportante', 'concentrico', 'soldadura', 'automotriz',
+  'aluminio', 'desnudo', 'control', 'flexible', 'soldar',
+  'tierra', 'lsohx', 'n2xsy', 'n2xh', 'n2xy', 'halogeno',
+  'lsoh', 'ttrf', 'caai', 'seco', 'rvk', 'nyy', 'nmt',
+  'npt', 'cpt', 'cpi', 'nlt', 'sgt', 'gpt', 'ws',
+  '4mm2',
+];
+
 // Classify a keyword's relevance to the requested cable type.
 // Returns { relevant: false } for keywords that clearly belong to another type.
 function getRelevancia(
@@ -79,17 +106,25 @@ function getRelevancia(
 ): { relevant: boolean; relevancia: 'directa' | 'generica' } {
   const kw = keyword.toLowerCase();
 
-  // Direct hit — keyword contains a term specific to this cable type
-  for (const t of propios) {
-    if (kw.includes(t)) return { relevant: true, relevancia: 'directa' };
-  }
+  // Step 0: Known brand/price term — universally relevant, skip all type checks
+  if (GENERIC_BRAND_TERMS.has(kw)) return { relevant: true, relevancia: 'generica' };
 
-  // Exclusion — keyword contains a term belonging to another cable type
+  // Step 1: Contains a term belonging to another cable type — exclude
   for (const t of excluidos) {
     if (kw.includes(t)) return { relevant: false, relevancia: 'generica' };
   }
 
-  // Generic — brand/price keyword with no type-specific term; valid for any type
+  // Step 2: Contains a term specific to this cable type — direct hit
+  for (const t of propios) {
+    if (kw.includes(t)) return { relevant: true, relevancia: 'directa' };
+  }
+
+  // Step 3: Contains a cable-type noun not in the dictionary — exclude as noise
+  for (const t of GENERIC_BLOCKERS) {
+    if (kw.includes(t)) return { relevant: false, relevancia: 'generica' };
+  }
+
+  // Default: generic brand/price/utility keyword valid for any type
   return { relevant: true, relevancia: 'generica' };
 }
 
