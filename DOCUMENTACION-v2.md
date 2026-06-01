@@ -134,6 +134,71 @@ PROCEDE DE FORMA CONSERVADORA Y DOCUMENTADA.
 
 ---
 
+## ⚠️ DECISIONES DE ARQUITECTURA IRREVOCABLES
+
+> **LECTURA OBLIGATORIA** antes de cualquier cambio de código, schema o pipeline.
+> Estas decisiones NO se revierten sin revisión explícita documentada.
+
+---
+
+### 1. ATRIBUTOS EN JSONB — NUNCA COLUMNAS INDIVIDUALES
+Todos los atributos específicos por tipo de producto van en el campo `atributos jsonb`. Nunca agregar columnas individuales para atributos de producto, sin importar cuántos productos o categorías existan. Aplica para cables, breakers, transformadores, conduit, tomacorrientes, terminales, y cualquier categoría futura.
+Razón: cada categoría tiene atributos completamente distintos. Una tabla plana con columnas fijas es inmantenible.
+
+### 2. CADA VARIANTE = 1 FILA EN productos_catalogo
+Cada calibre/variante de un conductor es un registro independiente en `productos_catalogo`. El pipeline de aprobación debe insertar N filas, una por variante. NO se crea 1 registro por tipo de cable.
+Ejemplo: NH-90 con 4 calibres → 4 filas en `productos_catalogo`.
+
+### 3. SLUGS DE VARIANTE INCLUYEN EL CALIBRE
+Formato: `{marca}-{tipo}-{calibre}-{descripcion-corta}`
+Ejemplo: `indeco-nh-90-2-5mm2-libre-halogeno`
+Esto permite páginas SEO individuales por calibre.
+
+### 4. PRODUCTO_PADRE_ID Y VARIANTE_ID EN ATRIBUTOS JSONB
+Cada variante incluye en su campo `atributos jsonb`:
+`{ "producto_padre_id": "uuid-del-core", "variante_id": "id-del-array-original" }`
+Para poder agrupar variantes del mismo tipo. Son campos dentro del jsonb, NO columnas separadas en la tabla.
+
+### 5. DISPONIBLE_PERU = FALSE POR DEFECTO AL APROBAR
+Al aprobar un candidato, todas las filas se insertan con `disponible_peru = false`. El operador activa manualmente producto por producto después de verificar precio y disponibilidad real.
+
+### 6. RAW_JSON ES INMUTABLE
+Claude escribe `raw_json` una sola vez al extraer el PDF. Nunca se modifica bajo ninguna circunstancia.
+`edited_json` es la copia editable del operador. `final_json` es lo que se aprueba e inserta.
+
+### 7. SCHEMA JSON DE CONDUCTORES — ESTRUCTURA FIJA
+La estructura del JSON extraído por Claude es:
+`PRODUCTO_CORE + VARIANTE[] + EXTENSIONES_DINAMICAS + GRAPH_RELATIONS`
+- `EXTENSIONES_DINAMICAS`: permite agregar atributos de minería, instrumentación, solar sin romper el schema base existente.
+- `GRAPH_RELATIONS`: 4 tipos: equivalencias, reemplazos, sustituye_a, compatibilidades. Es el corazón del industrial graph.
+
+No modificar esta estructura sin revisión explícita.
+
+### 8. NORMALIZACION_TECNICA EN DOS NIVELES
+Existe en `PRODUCTO_CORE` (sistema de unidades del producto completo) y en `VARIANTE` (conversión AWG↔mm² por calibre).
+Sin esto no se pueden comparar cables en AWG con cables en mm².
+No eliminar ni fusionar estos dos niveles.
+
+### 9. ALIASES_BUSQUEDA DEBEN INCLUIRSE EN SEARCH_VECTOR
+Los `aliases_busqueda` del `PRODUCTO_CORE` (términos del mercado peruano como "cable nh 80", "lsoh", "tw indeco") deben alimentar el `search_vector tsvector` para que el FTS los capture.
+**PENDIENTE:** implementar esto en el trigger de Supabase o en la lógica de inserción del approve route.
+
+### 10. FTS EN 3 CAPAS — NO ROMPER
+La búsqueda del catálogo usa 3 capas en orden:
+1. Si query es código numérico → buscar por `codigo_fabricante`
+2. FTS con `textSearch('search_vector', query, {type:'plain', config:'spanish'})` con variantes de prefijo generadas por `processSearchQuery()`
+3. ILIKE fallback si FTS no devuelve resultados
+
+No simplificar ni reemplazar esta lógica sin revisión explícita.
+
+### 11. FLUJO DE TRABAJO — CLAUDE WEB vs CLAUDE CODE
+- Claude.ai web: planificación, análisis, decisiones de arquitectura, generación de prompts para Code.
+- Claude Code en VS Code: ejecución de código, commits, push.
+- Claude.ai web NUNCA ejecuta código directamente en el repo.
+- Todo cambio de código pasa por Claude Code.
+
+---
+
 ## 1. RESUMEN EJECUTIVO
 
 ### Descripción del Proyecto
@@ -169,6 +234,15 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 ---
 
 ## 📋 REGISTRO DE CAMBIOS
+
+### [2026-05-31] — Agregada sección DECISIONES DE ARQUITECTURA IRREVOCABLES
+
+**Cambios realizados:**
+- `DOCUMENTACION-v2.md` — Nueva sección `## ⚠️ DECISIONES DE ARQUITECTURA IRREVOCABLES` insertada después de la tabla de contenidos y antes del Resumen Ejecutivo. Contiene 11 decisiones irrevocables sobre: atributos en JSONB, variantes como filas independientes, formato de slugs, producto_padre_id, disponible_peru=false por defecto, inmutabilidad de raw_json, schema JSON de conductores, normalización técnica en dos niveles, aliases en search_vector, FTS en 3 capas, y flujo Claude web vs Claude Code.
+
+**Estado:** ✅ Completado
+
+---
 
 ### [2026-05-31] — Rediseño sistema sugerencias de aliases SEO: de IA a keywords reales
 
