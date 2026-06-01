@@ -235,6 +235,19 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ## 📋 REGISTRO DE CAMBIOS
 
+### [2026-05-31] — Corrección de contradicción en documentación del approve route
+
+**Problema identificado:**
+- La tabla de API Routes describía `POST /api/pipeline/approve` como "embebe VARIANTES en atributos.variantes", contradiciendo la DECISIÓN IRREVOCABLE #2 (cada variante = 1 fila independiente).
+
+**Cambios realizados:**
+- `DOCUMENTACION-v2.md` — Fila de `POST /api/pipeline/approve` en tabla API Routes marcada como `[PENDIENTE DE IMPLEMENTAR]` con descripción correcta del comportamiento esperado.
+- `DOCUMENTACION-v2.md` — Nueva subsección `### ⚠️ Cambio pendiente crítico — approve route` al final del bloque del Pipeline con: especificación del cambio correcto (N filas por variante, slugs con calibre, atributos jsonb con producto_padre_id), ejemplos de slugs para NH-90, y nota sobre los 3 candidatos ya aprobados que deben re-procesarse.
+
+**Estado:** ✅ Completado (solo documentación — implementación pendiente)
+
+---
+
 ### [2026-05-31] — Documentación completa del Sistema de Keywords SEO
 
 **Cambios realizados:**
@@ -3084,7 +3097,7 @@ Todas requieren `Authorization: Bearer {firebase_id_token}` de usuario con claim
 | GET | `/api/pipeline/candidates/[id]` | Devuelve candidato completo incluyendo `raw_json` y `edited_json` | `{ candidato: PipelineCandidato }` |
 | PATCH | `/api/pipeline/candidates/[id]` | Auto-save del editor: actualiza `edited_json` y/o `notas` | `{ saved: true }` |
 | POST | `/api/pipeline/reject` | Marca candidato como `rejected`. Solo actúa si `status='pending'`. Registra `reviewed_by` + `reviewed_at` | `{ rejected: true }` |
-| POST | `/api/pipeline/approve` | Mapea `PRODUCTO_CORE` → `productos_catalogo`, embebe `VARIANTES` en `atributos.variantes`, inserta con `disponible_peru=false`. Marca candidato `approved` con `producto_id` | `{ producto_id, approved: true }` |
+| POST | `/api/pipeline/approve` | **[PENDIENTE DE IMPLEMENTAR]** Debe insertar N filas en `productos_catalogo` — una por cada VARIANTE del candidato. Cada fila combina datos del `PRODUCTO_CORE` + datos de la variante específica en `atributos` jsonb. Actualmente inserta 1 sola fila con `VARIANTES` embebidas — esto es incorrecto y debe corregirse. Ver DECISIÓN IRREVOCABLE #2 y #3. | `{ producto_id, approved: true }` |
 | GET | `/api/pipeline/keywords/upload` | Devuelve estadísticas de keywords cargadas agrupadas por tipo de cable | `{ stats: KeywordStat[] }` |
 | POST | `/api/pipeline/keywords/upload` | Recibe `{ csv_text, tipo_cable }` (UTF-16 ya decodificado en cliente). Parsea CSV de Google Keyword Planner (skip 3 headers, tab-separated). Upsert a `keyword_stats` con `onConflict: 'keyword,tipo_cable'` | `{ inserted, updated, errors[] }` |
 | GET | `/api/pipeline/keywords/suggest` | Recibe `?tipo_cable=X&existing_aliases=a,b,c`. Filtra `avg_monthly_searches ≥ 50`, excluye existing, excluye `change_yoy ≤ -50%`. Clasifica `core` vs `variante` con `CALIBRE_RE` | `SuggestKeywordsResponse` |
@@ -3310,6 +3323,34 @@ El sistema de sugerencias de keywords (`/api/pipeline/keywords/suggest`) es una 
 # Ya instalado:
 npm install @anthropic-ai/sdk
 ```
+
+---
+
+### ⚠️ Cambio pendiente crítico — approve route
+
+El `/api/pipeline/approve` actual inserta **1 registro** en `productos_catalogo` con las variantes embebidas en `atributos.variantes`. Esto contradice la DECISIÓN IRREVOCABLE #2 y debe corregirse.
+
+**El cambio correcto (pendiente de implementar):**
+- Insertar **N filas** en `productos_catalogo`, una por variante del candidato
+- Cada fila tiene slug único que incluye el calibre (DECISIÓN IRREVOCABLE #3)
+  - Ejemplo para NH-90 con 4 calibres: `indeco-nh-90-2-5mm2`, `indeco-nh-90-4mm2`, `indeco-nh-90-6mm2`, `indeco-nh-90-10mm2`
+- Cada fila incluye en `atributos` jsonb:
+  ```json
+  {
+    "producto_padre_id": "<uuid-del-candidato-core>",
+    "variante_id": "<id-del-array-original>",
+    "<datos técnicos de esa variante específica>": "..."
+  }
+  ```
+- `PRODUCTO_CORE` (nombre, fabricante, tipo, normas, etc.) se repite en todas las filas
+- Los datos de `VARIANTE[i]` (sección, ampacidad, diámetros, etc.) son únicos por fila
+
+**Estado de los candidatos ya aprobados:**
+- Los 3 candidatos aprobados (NH-90, TW-80, THW-90) fueron insertados con la lógica incorrecta (1 fila con variantes embebidas)
+- Deben ser re-aprobados después de implementar el cambio correcto
+- Los registros actuales en `productos_catalogo` con variantes embebidas deben eliminarse primero
+
+**Prioridad:** Alta — afecta SEO por calibre y búsquedas en catálogo.
 
 ---
 
