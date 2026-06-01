@@ -235,6 +235,15 @@ La plataforma está diseñada para soportar **5,000 - 10,000 usuarios activos** 
 
 ## 📋 REGISTRO DE CAMBIOS
 
+### [2026-05-31] — Documentación completa del Sistema de Keywords SEO
+
+**Cambios realizados:**
+- `DOCUMENTACION-v2.md` — Nueva sección `## 🔍 Sistema de Keywords SEO` al final del bloque `## 🏭 STARLOGIC Data Pipeline`. Documenta: tabla `keyword_stats` completa con corrección del campo `competition` (valores en español: 'Baja'/'Media'/'Alta', no inglés), rutas POST/GET `/api/pipeline/keywords/upload` y GET `/api/pipeline/keywords/suggest` con scoring compuesto detallado, tipos `SuggestionItem` y `SuggestKeywordsResponse` actualizados (incluye `relevancia` y `score`), página `/admin/pipeline/keywords`, flujo operativo de 6 pasos, tabla comparativa bot Claude vs sistema actual. Nota obsoleta "Bot de aliases SEO" actualizada para referenciar el sistema actual.
+
+**Estado:** ✅ Completado
+
+---
+
 ### [2026-05-31] — Agregada sección DECISIONES DE ARQUITECTURA IRREVOCABLES
 
 **Cambios realizados:**
@@ -3286,8 +3295,8 @@ Si Claude devuelve JSON no parseable, el sistema igualmente inserta el candidato
 **Auto-save con debounce de 2 segundos.**  
 Cada cambio en el editor de la Review Interface programa un PATCH a `/api/pipeline/candidates/[id]` con delay de 2s. Si el operador aprueba o rechaza antes de que se ejecute, el save se hace síncronamente antes de la acción. El operador nunca pierde cambios.
 
-**Bot de aliases SEO separado del auto-save.**  
-El bot de sugerencias (`suggest-aliases`) es una llamada on-demand — no está integrado al flujo de auto-save. Cuando el operador acepta un alias sugerido, ese alias se agrega al array `aliases_busqueda` del JSON en estado, lo que sí dispara el auto-save normalmente. El estado del bot (`botSuggestions`, `acceptedAliases`) es local a la sesión — no se persiste; si el operador recarga la página, los chips desaparecen pero los aliases aceptados ya están guardados en `edited_json`.
+**Sugerencias de aliases SEO separadas del auto-save.**  
+El sistema de sugerencias de keywords (`/api/pipeline/keywords/suggest`) es una llamada on-demand — no está integrado al flujo de auto-save. Cuando el operador acepta un alias sugerido (chip click), ese alias se agrega al array `aliases_busqueda` del JSON en estado, lo que sí dispara el auto-save normalmente. El estado de las sugerencias (`kwSuggestions`, `acceptedKw`) es local a la sesión — no se persiste; si el operador recarga la página, los chips desaparecen pero los aliases aceptados ya están guardados en `edited_json`. Ver sección `## 🔍 Sistema de Keywords SEO`.
 
 ---
 
@@ -3301,6 +3310,164 @@ El bot de sugerencias (`suggest-aliases`) es una llamada on-demand — no está 
 # Ya instalado:
 npm install @anthropic-ai/sdk
 ```
+
+---
+
+## 🔍 Sistema de Keywords SEO
+
+**Parte del STARLOGIC Data Pipeline** | Implementado: Mayo–Junio 2026
+
+Permite sugerir aliases SEO reales durante la revisión de candidatos usando datos de Google Keyword Planner subidos por el operador. **Sin IA, sin costo por consulta.** El bot Claude de sugerencias fue reemplazado por este sistema porque los volúmenes inventados no tienen valor para SEO.
+
+---
+
+### Tabla `keyword_stats` (Supabase)
+
+Tabla en el proyecto **STARLOGIC-CATALOGO** (misma instancia que `pipeline_candidatos`).  
+Sin RLS — tabla interna de administración, accesible únicamente con service key server-side.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `keyword` | text NOT NULL | Keyword en minúsculas |
+| `tipo_cable` | text NOT NULL | Clave del diccionario `CABLE_NOMENCLATURE` (ej: `TW-80`, `NH`) |
+| `avg_monthly_searches` | integer | Promedio de búsquedas/mes. Rangos como "100–1,000" → lower bound (100) |
+| `competition` | text NULL | Valor del KWP en español: `'Alta'` \| `'Media'` \| `'Baja'` \| null |
+| `change_3m` | text NULL | Cambio en 3 meses (ej: `'0%'`, `'-90%'`, `'+15%'`) |
+| `change_yoy` | text NULL | Cambio interanual (ej: `'-30%'`) |
+| `uploaded_at` | timestamptz | Timestamp de última actualización de esta fila |
+
+**Constraint UNIQUE:** `(keyword, tipo_cable)` — upsert en conflicto.
+
+**Índices:**
+- `idx_keyword_stats_tipo_cable` ON `tipo_cable`
+- `idx_keyword_stats_volume` ON `(tipo_cable, avg_monthly_searches DESC)`
+
+> ⚠️ `competition` almacena los valores del KWP en **español** (`'Baja'`, `'Media'`, `'Alta'`), no inglés. Google KWP en español exporta esos valores directamente.
+
+---
+
+### Rutas API
+
+#### POST `/api/pipeline/keywords/upload`
+
+- **Auth:** admin token (Firebase ID token con claim `admin: true`)
+- **Body:** `{ csv_text: string, tipo_cable: string }`
+- El cliente decodifica el archivo UTF-16 LE antes de enviarlo (BOM detection: `0xFF 0xFE`)
+- **Parseo CSV:** skip primeras 3 filas de header; separador tab; columnas:
+  - `[0]` Keyword
+  - `[2]` Avg. monthly searches (parsea rangos `"100 - 1,000"` → 100)
+  - `[3]` Cambio en tres meses
+  - `[4]` Cambio interanual
+  - `[5]` Competition
+- Upsert a `keyword_stats` con `onConflict: 'keyword,tipo_cable'`
+- **Retorna:** `{ inserted: number, updated: number, errors: string[] }`
+
+#### GET `/api/pipeline/keywords/upload`
+
+- **Auth:** admin token
+- Devuelve estadísticas agrupadas: `COUNT(*)` y `MAX(uploaded_at)` por `tipo_cable`
+- Usado por la página de gestión para mostrar la tabla de resumen
+- **Retorna:** `{ stats: Array<{ tipo_cable, count, last_uploaded }> }`
+
+#### GET `/api/pipeline/keywords/suggest`
+
+- **Auth:** admin token
+- **Query params:**
+  - `tipo_cable` (required) — clave del diccionario, ej: `TW-80`
+  - `existing_aliases` (optional) — aliases ya aceptados, separados por coma
+  - `max_core` (optional, default `10`) — máximo de sugerencias core
+  - `max_variante` (optional, default `8`) — máximo de sugerencias variante
+- Consulta `keyword_stats` filtrando `avg_monthly_searches ≥ 50`
+- **Filtro de relevancia** en 4 pasos (orden de evaluación):
+  1. `GENERIC_BRAND_TERMS` (exacto): keywords de marca/precio universal (ej: "cable indeco") → `relevancia: 'generica'`, incluir sin más análisis
+  2. Contiene término de tipo **excluido** (otro tipo de cable del diccionario) → descartar
+  3. Contiene término **propio** del tipo solicitado → `relevancia: 'directa'`
+  4. Contiene `GENERIC_BLOCKERS` (sustantivos de cable no en el diccionario: caai, concentrico, autoportante, lsoh, etc.) → descartar; en caso contrario → `relevancia: 'generica'`
+- **Hard filter:** `change_yoy ≤ -50%` → descartada (decline severo)
+- **Scoring compuesto** (orden de prioridad en resultados):
+
+| Componente | Peso | Puntos |
+|---|---|---|
+| Volumen (`avg_monthly_searches`) | 50% | ≥5000→50, ≥1000→40, ≥500→30, ≥100→20, ≥50→10 |
+| Competencia (`competition`) | 25% | Baja→25, Media→15, Alta→5, null→10 |
+| Tendencia (`change_yoy`) | 25% | ≥0%→25, hasta -30%→15, hasta -60%→5, peor→0 |
+| Bonus `change_3m` | ±5 pts | positivo→+5, ≤-50%→-5 |
+| Bonus `relevancia` | +20 pts | solo si `directa` |
+
+- **Clasificación `core` vs `variante`:**
+  - Todas las keywords se ordenan por score descendente
+  - Las **top 3 por score → forzadas a `core`** (independientemente de si contienen calibre)
+  - El resto: `CALIBRE_RE` separa core (sin calibre) de variante (con calibre: 14, 12, 2.5, 4mm, AWG, mm², etc.)
+  - Finalmente se aplica `slice(0, max_core)` y `slice(0, max_variante)`
+- **Retorna:** `SuggestKeywordsResponse`
+
+```typescript
+// Tipos exportados desde src/app/api/pipeline/keywords/suggest/route.ts
+
+interface SuggestionItem {
+  keyword:              string;
+  avg_monthly_searches: number;
+  competition:          string | null;  // 'Baja' | 'Media' | 'Alta' | null
+  change_3m:            string | null;
+  change_yoy:           string | null;
+  priority:             'alta' | 'media' | 'baja';  // alta ≥500, media ≥100, baja ≥50
+  tipo:                 'core' | 'variante';
+  relevancia:           'directa' | 'generica';
+  score:                number;  // score compuesto para debugging/ordenación
+}
+
+interface SuggestKeywordsResponse {
+  core:               SuggestionItem[];
+  variante:           SuggestionItem[];
+  total_keywords_db:  number;  // 0 = no hay datos cargados para este tipo
+}
+```
+
+---
+
+### Página de gestión `/admin/pipeline/keywords`
+
+- **Acceso:** solo admin (protegida por `AdminRoute`)
+- **Origen en navbar:** botón "Keywords" (icono `BarChart2`) en el header de la lista de Candidatos → `/admin/pipeline/keywords`; también card en `/admin`
+- **Contenido:**
+  - Tabla de resumen: tipo de cable · cantidad de keywords · fecha de última carga
+  - Botón "Subir CSV" → Dialog con:
+    - Select de tipo de cable (lista de `CABLE_TYPES`)
+    - File input múltiple (hasta 5 archivos, `.csv`)
+    - Procesamiento **secuencial** con indicador: "Procesando archivo 2 de 4…"
+    - Resumen final por archivo: insertadas + errores
+  - BOM detection automática: `0xFF 0xFE` → UTF-16 LE; `0xFE 0xFF` → UTF-16 BE; sin BOM → UTF-16 LE por defecto
+
+---
+
+### Flujo de trabajo operativo
+
+1. **Exportar:** Google Keyword Planner → Plan → Descargar → CSV (formato UTF-16, separador tab)
+2. **Cargar:** `/admin/pipeline/keywords` → Subir CSV → Seleccionar tipo de cable → puede seleccionar hasta 5 archivos del mismo tipo
+3. **Revisar candidato:** en `/admin/pipeline/[id]` → campo "Alias de búsqueda" → botón "Sugerir aliases"
+4. **Panel de sugerencias:** muestra ≤18 chips ordenados por score:
+   - Chips **core** (verde=alta, amarillo=media, gris=baja): click para agregar al `aliases_busqueda`
+   - Chips **variante** (ámbar): también clicables — se agregan al core; label "Por calibre — click para agregar al core"
+   - Cada chip muestra: keyword · volumen (ej: `4.5k`) · indicador de competencia `● Baja/Media/Alta` con color verde/amarillo/rojo
+   - Tooltip: búsquedas/mes + competencia en texto
+5. **Aceptar:** click individual o "Aceptar todos" → auto-save debounce 2s → alias guardado en `edited_json`
+6. **Sin datos:** si `total_keywords_db === 0`, panel muestra link a `/admin/pipeline/keywords` para cargar primero
+
+---
+
+### DECISIÓN CLAVE — Sin IA, sin costo
+
+El sistema NO llama a Claude API para sugerir keywords. Usa exclusivamente datos reales de Google Keyword Planner subidos por el operador.
+
+| | Bot Claude (eliminado) | Sistema actual |
+|---|---|---|
+| **Costo** | ~$0.01–0.05 por consulta | $0 por consulta |
+| **Latencia** | 15–30 segundos | <100 ms |
+| **Fuente** | Inventado por IA | Volúmenes reales de búsqueda |
+| **Fiabilidad** | Keywords ficticias sin respaldo | Datos verificados de Google |
+
+**Reemplazado en mayo–junio 2026.** El route `src/app/api/pipeline/suggest-aliases/route.ts` fue eliminado. No recrear.
 
 > Firebase Admin SDK (`firebase-admin`) ya estaba en el proyecto. Supabase JS (`@supabase/supabase-js`) también. Solo se agregó el SDK de Anthropic.
 
