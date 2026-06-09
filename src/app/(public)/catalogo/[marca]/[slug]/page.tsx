@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, FileText, Zap, ExternalLink, Phone } from 'lucide-react';
+import { ArrowLeft, FileText, Zap, ExternalLink, Phone, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { catalogoClient } from '@/lib/supabase/catalogo-client';
@@ -22,50 +22,154 @@ interface ProveedorProducto {
   } | null;
 }
 
+// ── Campos que nunca se muestran al público ───────────────────────────────────
+
+const CAMPOS_OCULTOS = new Set([
+  'producto_padre_id',
+  'variante_id',
+  'graph_relations',
+  'tipo_cable',
+  'conductores',           // estructural interno
+  'normalizacion_tecnica_core',  // muy técnico, sin valor para el usuario
+  'extensiones',           // objeto muy grande con datos de nicho
+  'source_metadata',
+  'estado_catalogo',
+]);
+
+// Priority fields appear first (in this order), the rest go to "advanced"
+const PRIORITY_FIELDS = [
+  'configuracion_display',
+  'material_conductor',
+  'material_aislamiento',
+  'temperatura_operacion_c',
+  'temperatura_cortocircuito_c',
+  'peso_kg_km',
+  'nivel_tension',
+  'clase_conductor',
+  'colores_disponibles',
+  'metodos_instalacion',
+  'aplicaciones',
+  'presentacion',
+  'certificaciones',
+];
+
+// ── Labels ────────────────────────────────────────────────────────────────────
+
 const ATRIBUTO_LABELS: Record<string, string> = {
-  corriente_a:      'Corriente nominal',
-  polos:            'Número de polos',
-  ruptura_ka:       'Capacidad de ruptura',
-  curva:            'Curva de disparo',
-  tension_v:        'Tensión nominal',
-  sensibilidad_ma:  'Sensibilidad diferencial',
-  tipo_diferencial: 'Tipo diferencial',
-  tension_bobina_v: 'Tensión de bobina',
-  potencia_kw:      'Potencia',
-  fases:            'Fases',
-  uso:              'Uso',
-  diametro_pulg:    'Diámetro',
-  tipo:             'Tipo',
-  longitud_m:       'Longitud',
-  norma:            'Norma',
-  con_usb:          'Puertos USB',
-  puertos_usb:      'Cantidad USB',
-  linea:            'Línea',
+  // CHINT / breakers / electromecánicos
+  corriente_a:              'Corriente nominal',
+  polos:                    'Número de polos',
+  ruptura_ka:               'Capacidad de ruptura',
+  curva:                    'Curva de disparo',
+  tension_v:                'Tensión nominal',
+  sensibilidad_ma:          'Sensibilidad diferencial',
+  tipo_diferencial:         'Tipo diferencial',
+  tension_bobina_v:         'Tensión de bobina',
+  potencia_kw:              'Potencia',
+  fases:                    'Fases',
+  uso:                      'Uso',
+  diametro_pulg:            'Diámetro',
+  tipo:                     'Tipo',
+  longitud_m:               'Longitud',
+  norma:                    'Norma',
+  con_usb:                  'Puertos USB',
+  puertos_usb:              'Cantidad USB',
+  linea:                    'Línea',
+  // Conductores
+  configuracion_display:       'Calibre',
+  material_conductor:          'Material conductor',
+  material_aislamiento:        'Aislamiento',
+  temperatura_operacion_c:     'Temperatura operación',
+  temperatura_cortocircuito_c: 'Temperatura cortocircuito',
+  peso_kg_km:                  'Peso (kg/km)',
+  nivel_tension:               'Nivel de tensión',
+  clase_conductor:             'Clase conductor',
+  colores_disponibles:         'Colores disponibles',
+  metodos_instalacion:         'Métodos de instalación',
+  aplicaciones:                'Aplicaciones',
+  presentacion:                'Presentación',
+  certificaciones:             'Certificaciones',
+  seccion:                     'Sección',
+  diametros:                   'Diámetros',
+  tension_nominal:             'Tensión nominal',
+  performance_electrica:       'Rendimiento eléctrico',
+  propiedades:                 'Propiedades',
+  clasificacion_incendio:      'Clasificación incendio',
+  normalizacion_tecnica:       'Normalización técnica',
 };
 
-function formatAtributoValue(key: string, value: unknown): string {
+// ── Value renderer ────────────────────────────────────────────────────────────
+
+function renderAtributoValue(key: string, value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+
   if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-  if (key === 'corriente_a')     return `${value} A`;
-  if (key === 'ruptura_ka')      return `${value} kA`;
-  if (key === 'sensibilidad_ma') return `${value} mA`;
-  if (key === 'tension_v' || key === 'tension_bobina_v') return `${value} V`;
-  if (key === 'potencia_kw')     return `${value} kW`;
-  if (key === 'diametro_pulg')   return `${value}"`;
-  if (key === 'longitud_m')      return `${value} m`;
+
+  // Arrays
+  if (Array.isArray(value)) {
+    const items = (value as unknown[])
+      .filter((v) => v !== null && v !== undefined && v !== '')
+      .map(String);
+    return items.length > 0 ? items.join(', ') : null;
+  }
+
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+
+    // { valor, unidad } pattern — e.g. { valor: 4, unidad: "mm2" } → "4 mm²"
+    if ('valor' in obj && 'unidad' in obj && Object.keys(obj).length === 2) {
+      const unidad = String(obj.unidad).replace('mm2', 'mm²');
+      return `${obj.valor} ${unidad}`;
+    }
+
+    // propiedades boolean map — show only true keys
+    if (key === 'propiedades') {
+      const props = Object.entries(obj)
+        .filter(([, v]) => v === true)
+        .map(([k]) => k.replace(/_/g, ' '));
+      return props.length > 0 ? props.join(' · ') : null;
+    }
+
+    // Other objects — "key: value" pairs, skip nulls and nested objects
+    const parts: string[] = [];
+    for (const [k, v] of Object.entries(obj)) {
+      if (v === null || v === undefined || v === '') continue;
+      if (typeof v === 'object') continue;   // skip deeply nested
+      const label = k.replace(/_/g, ' ');
+      const formatted = typeof v === 'boolean' ? (v ? 'Sí' : 'No') : String(v);
+      parts.push(`${label}: ${formatted}`);
+    }
+    return parts.length > 0 ? parts.join(' · ') : null;
+  }
+
+  // Primitives with units
+  if (key === 'corriente_a')                                     return `${value} A`;
+  if (key === 'ruptura_ka')                                      return `${value} kA`;
+  if (key === 'temperatura_operacion_c' ||
+      key === 'temperatura_cortocircuito_c')                     return `${value}°C`;
+  if (key === 'sensibilidad_ma')                                 return `${value} mA`;
+  if (key === 'peso_kg_km')                                      return `${value} kg/km`;
+  if (key === 'tension_v' || key === 'tension_bobina_v')         return `${value} V`;
+  if (key === 'potencia_kw')                                     return `${value} kW`;
+  if (key === 'diametro_pulg')                                   return `${value}"`;
+  if (key === 'longitud_m')                                      return `${value} m`;
+
   return String(value);
 }
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ProductoDetailPage() {
   const params = useParams();
   const marca = decodeURIComponent(params.marca as string);
   const slug  = decodeURIComponent(params.slug  as string);
 
-  const [producto,   setProducto]   = useState<ProductoCatalogo | null>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [notFound,   setNotFound]   = useState(false);
+  const [producto,    setProducto]    = useState<ProductoCatalogo | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [notFound,    setNotFound]    = useState(false);
   const [proveedores, setProveedores] = useState<ProveedorProducto[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // SEO: título dinámico
   useEffect(() => {
     if (producto) {
       document.title = `${producto.modelo} — ${producto.marca} | STARLOGIC`;
@@ -143,9 +247,25 @@ export default function ProductoDetailPage() {
     );
   }
 
-  const atributosEntries = producto.atributos
-    ? Object.entries(producto.atributos).filter(([, v]) => v != null)
-    : [];
+  // Build display entries: filter hidden fields, render values, skip nulls
+  const rawAtributos = (producto.atributos ?? {}) as Record<string, unknown>;
+  const displayEntries: [string, string][] = Object.entries(rawAtributos)
+    .filter(([key]) => !CAMPOS_OCULTOS.has(key))
+    .flatMap(([key, value]) => {
+      const rendered = renderAtributoValue(key, value);
+      if (rendered === null) return [];
+      return [[key, rendered] as [string, string]];
+    });
+
+  const prioritySet    = new Set(PRIORITY_FIELDS);
+  const priorityMap    = new Map(displayEntries);
+  const priorityRows   = PRIORITY_FIELDS
+    .filter((f) => priorityMap.has(f))
+    .map((f) => [f, priorityMap.get(f)!] as [string, string]);
+  const advancedRows   = displayEntries.filter(([key]) => !prioritySet.has(key));
+
+  const hasSpecs = displayEntries.length > 0 || !!producto.codigo_fabricante;
+  const codOffset = producto.codigo_fabricante ? 1 : 0;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -186,7 +306,7 @@ export default function ProductoDetailPage() {
           </div>
 
           {/* Especificaciones técnicas */}
-          {(atributosEntries.length > 0 || producto.codigo_fabricante) && (
+          {hasSpecs && (
             <div className="mb-6">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                 Especificaciones técnicas
@@ -194,6 +314,7 @@ export default function ProductoDetailPage() {
               <div className="rounded-lg border overflow-hidden">
                 <table className="w-full text-sm">
                   <tbody>
+                    {/* Código de fabricante */}
                     {producto.codigo_fabricante && (
                       <tr className="bg-muted/30">
                         <td className="px-4 py-2.5 text-muted-foreground w-1/2">
@@ -204,23 +325,53 @@ export default function ProductoDetailPage() {
                         </td>
                       </tr>
                     )}
-                    {atributosEntries.map(([key, value], i) => (
+
+                    {/* Priority fields */}
+                    {priorityRows.map(([key, rendered], i) => (
                       <tr
                         key={key}
-                        className={
-                          (i + (producto.codigo_fabricante ? 1 : 0)) % 2 === 0
-                            ? 'bg-muted/30'
-                            : 'bg-background'
-                        }
+                        className={(i + codOffset) % 2 === 0 ? 'bg-muted/30' : 'bg-background'}
                       >
                         <td className="px-4 py-2.5 text-muted-foreground w-1/2">
                           {ATRIBUTO_LABELS[key] ?? key}
                         </td>
-                        <td className="px-4 py-2.5 font-mono font-medium">
-                          {formatAtributoValue(key, value)}
+                        <td className="px-4 py-2.5 font-medium">
+                          {rendered}
                         </td>
                       </tr>
                     ))}
+
+                    {/* Advanced toggle + rows */}
+                    {advancedRows.length > 0 && (
+                      <>
+                        <tr className="border-t">
+                          <td colSpan={2} className="px-4 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowAdvanced((s) => !s)}
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:opacity-80 transition-opacity"
+                            >
+                              {showAdvanced
+                                ? <><ChevronUp className="h-3 w-3" /> Ocultar especificaciones avanzadas</>
+                                : <><ChevronDown className="h-3 w-3" /> Ver {advancedRows.length} especificaciones avanzadas</>}
+                            </button>
+                          </td>
+                        </tr>
+                        {showAdvanced && advancedRows.map(([key, rendered], i) => (
+                          <tr
+                            key={key}
+                            className={i % 2 === 0 ? 'bg-muted/30' : 'bg-background'}
+                          >
+                            <td className="px-4 py-2.5 text-muted-foreground w-1/2 align-top">
+                              {ATRIBUTO_LABELS[key] ?? key}
+                            </td>
+                            <td className="px-4 py-2.5 font-medium break-words">
+                              {rendered}
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -239,7 +390,7 @@ export default function ProductoDetailPage() {
             </div>
           )}
 
-          {/* Acciones */}
+          {/* Ficha técnica */}
           {producto.ficha_tecnica_pdf && (
             <div className="mb-8">
               <Button variant="outline" asChild>
@@ -297,7 +448,6 @@ export default function ProductoDetailPage() {
                   const tiendaHref = p.web ?? null;
                   return (
                     <div key={i} className="flex items-start gap-4 rounded-lg border p-4">
-                      {/* Logo o inicial */}
                       <div className="flex-shrink-0">
                         {p.logo_url ? (
                           <img src={p.logo_url} alt={p.nombre} className="w-12 h-12 rounded-md object-contain" sizes="48px" />
@@ -307,7 +457,6 @@ export default function ProductoDetailPage() {
                           </div>
                         )}
                       </div>
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-semibold text-sm">{p.nombre}</span>
