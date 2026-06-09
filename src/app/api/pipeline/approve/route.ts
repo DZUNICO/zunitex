@@ -28,6 +28,26 @@ function calibreSlug(seccion: Variante['seccion']): string {
   return String(seccion.valor).replace('.', '-') + seccion.unidad.toLowerCase();
 }
 
+// Build a short, SEO-friendly description specific to this variant.
+// Uses the normalized cable type + calibre; marks LSOH cables explicitly.
+function generarDescripcionCorta(
+  tipoCable: string,
+  variante: Variante,
+  materialAislamiento: string | null,
+): string {
+  const calibre = calibreDisplay(variante.seccion);   // "2.5mm2", "14awg"
+
+  const esLibreHalogeno =
+    tipoCable.includes('NH-90')  ||
+    tipoCable.includes('N2XOH')  ||
+    (materialAislamiento ?? '').toLowerCase().includes('hffr')           ||
+    (materialAislamiento ?? '').toLowerCase().includes('lsoh')           ||
+    (materialAislamiento ?? '').toLowerCase().includes('libre de halog');
+
+  const base = `Cable ${tipoCable} ${calibre}`.trim();
+  return esLibreHalogeno ? `${base} libre de halógeno` : base;
+}
+
 // ── POST /api/pipeline/approve ────────────────────────────────────────────────
 // ADR-002: inserts N rows in productos_catalogo — one per VARIANTE.
 // ADR-003: only reads edited_json/raw_json, never modifies raw_json.
@@ -144,7 +164,11 @@ export async function POST(request: NextRequest) {
     return {
       marca:                marcaRaw,
       modelo:               core.nombre_comercial ?? core.tipo_cable ?? 'sin-modelo',
-      descripcion:          core.descripcion_corta ?? core.descripcion_tecnica ?? null,
+      descripcion:          generarDescripcionCorta(
+                              tipoNormalizado ?? core.tipo_cable ?? '',
+                              v,
+                              core.material_aislamiento ?? null,
+                            ),
       categoria:            tipoNormalizado ?? core.tipo_cable ?? null,
       slug,
       nombres_alternativos: core.aliases_busqueda ?? [],
