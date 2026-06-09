@@ -60,6 +60,39 @@ const PRODUCTO_SELECT =
   'id, codigo_fabricante, marca, modelo, descripcion, categoria, slug, ' +
   'atributos, precio_ref_usd, imagen_url, ficha_tecnica_pdf, disponible_peru';
 
+// Virtual category key used only in the frontend — never stored in DB
+const CONDUCTOR_VIRTUAL_KEY = 'conductores';
+
+// Cable types that belong to "Cables BT" in the category explorer
+const CATEGORIAS_CONDUCTORES = new Set([
+  'NH-90', 'TW-80', 'THW-90', 'N2XOH', 'NYY', 'N2XY',
+  'RV-K', 'NLT', 'CTM', 'GPT', 'NHX-90', 'SOLAR_DC',
+]);
+
+// Cable cross-section icon — standard visual representation in the electrical industry
+function CableIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="2" />
+      <line x1="12" y1="3"  x2="12" y2="7" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+      <line x1="3"  y1="12" x2="7"  y2="12" />
+      <line x1="17" y1="12" x2="21" y2="12" />
+    </svg>
+  );
+}
+
 interface CategoriaPreview {
   categoria: string;
   imagen_url: string | null;
@@ -204,8 +237,9 @@ function CatalogoInner() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let q: any = catalogoClient.from('productos_catalogo').select(PRODUCTO_SELECT)
             .eq('disponible_peru', true);
-          if (categoriaParam !== 'all') q = q.eq('categoria', categoriaParam);
-          if (marcaParam !== 'all')     q = q.eq('marca', marcaParam);
+          if (categoriaParam === CONDUCTOR_VIRTUAL_KEY)  q = q.in('categoria', [...CATEGORIAS_CONDUCTORES]);
+          else if (categoriaParam !== 'all')            q = q.eq('categoria', categoriaParam);
+          if (marcaParam !== 'all')                     q = q.eq('marca', marcaParam);
           const { data, error: sbError } = await q.order('marca');
           if (sbError) throw sbError;
           setProductos(data ?? []);
@@ -216,8 +250,9 @@ function CatalogoInner() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let qq = q as any;
           qq = qq.eq('disponible_peru', true);
-          if (categoriaParam !== 'all') qq = qq.eq('categoria', categoriaParam);
-          if (marcaParam !== 'all')     qq = qq.eq('marca', marcaParam);
+          if (categoriaParam === CONDUCTOR_VIRTUAL_KEY)  qq = qq.in('categoria', [...CATEGORIAS_CONDUCTORES]);
+          else if (categoriaParam !== 'all')            qq = qq.eq('categoria', categoriaParam);
+          if (marcaParam !== 'all')                     qq = qq.eq('marca', marcaParam);
           return qq;
         };
 
@@ -342,29 +377,46 @@ function CatalogoInner() {
             Explorar por categoría
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {categoriasPreview.map((cat) => (
-              <button
-                key={cat.categoria}
-                onClick={() => handleCategoryClick(cat.categoria)}
-                className="flex items-center gap-3 rounded-lg border p-3 text-left hover:shadow-md hover:border-primary/40 transition-all duration-200 bg-card"
-              >
-                <div className="w-[60px] h-[60px] flex-shrink-0 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden">
-                  {cat.imagen_url ? (
-                    <img
-                      src={cat.imagen_url}
-                      alt={cat.categoria}
-                      className="w-full h-full object-contain"
-                      loading="lazy"
-                      decoding="async"
-                      sizes="60px"
-                    />
-                  ) : (
-                    <Zap className="h-6 w-6 text-muted-foreground/25" />
-                  )}
-                </div>
-                <span className="text-sm font-medium leading-snug">{cat.categoria}</span>
-              </button>
-            ))}
+            {(() => {
+              // Collapse all conductor categories into a single "Cables BT" chip
+              const grid: { key: string; label: string; imagen_url: string | null; filterKey: string }[] = [];
+              let addedConductores = false;
+              for (const cat of categoriasPreview) {
+                if (CATEGORIAS_CONDUCTORES.has(cat.categoria)) {
+                  if (!addedConductores) {
+                    grid.push({ key: CONDUCTOR_VIRTUAL_KEY, label: 'Cables BT', imagen_url: null, filterKey: CONDUCTOR_VIRTUAL_KEY });
+                    addedConductores = true;
+                  }
+                } else {
+                  grid.push({ key: cat.categoria, label: cat.categoria, imagen_url: cat.imagen_url, filterKey: cat.categoria });
+                }
+              }
+              return grid.map((entry) => (
+                <button
+                  key={entry.key}
+                  onClick={() => handleCategoryClick(entry.filterKey)}
+                  className="flex items-center gap-3 rounded-lg border p-3 text-left hover:shadow-md hover:border-primary/40 transition-all duration-200 bg-card"
+                >
+                  <div className="w-[60px] h-[60px] flex-shrink-0 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden">
+                    {entry.imagen_url ? (
+                      <img
+                        src={entry.imagen_url}
+                        alt={entry.label}
+                        className="w-full h-full object-contain"
+                        loading="lazy"
+                        decoding="async"
+                        sizes="60px"
+                      />
+                    ) : entry.key === CONDUCTOR_VIRTUAL_KEY ? (
+                      <CableIcon className="h-7 w-7 text-blue-500/60" />
+                    ) : (
+                      <Zap className="h-6 w-6 text-muted-foreground/25" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium leading-snug">{entry.label}</span>
+                </button>
+              ));
+            })()}
           </div>
         </div>
       )}
