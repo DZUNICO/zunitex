@@ -40,6 +40,19 @@ function getAtributoBadges(atributos: AtributosTecnicos): string[] {
   return badges;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getConductorBadges(atributos: Record<string, any>): string[] {
+  const badges: string[] = [];
+  if (atributos.configuracion_display)
+    badges.push(String(atributos.configuracion_display));
+  const amp = atributos?.performance_electrica?.ampacidad;
+  const corriente = amp?.ducto_a ?? amp?.aire_a ?? amp?.enterrado_a;
+  if (corriente != null) badges.push(`${corriente}A`);
+  const nHilos = atributos?.conductores?.n_hilos;
+  if (nHilos != null) badges.push(`${nHilos}H`);
+  return badges;
+}
+
 const normalizeText = (text: string): string =>
   text.toLowerCase().normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -618,7 +631,11 @@ function ProductoCard({
   canOfrecer?: boolean;
   isOfrecido?: boolean;
 }) {
-  const atributoBadges = p.atributos ? getAtributoBadges(p.atributos) : [];
+  const isConductor    = CATEGORIAS_CONDUCTORES.has(p.categoria);
+  const atributoBadges = p.atributos
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? (isConductor ? getConductorBadges(p.atributos as Record<string, any>) : getAtributoBadges(p.atributos))
+    : [];
   const href = p.slug
     ? `/catalogo/${p.marca.toLowerCase().replace(/\s+/g, '-')}/${p.slug}`
     : null;
