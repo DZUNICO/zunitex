@@ -96,6 +96,9 @@ const ATRIBUTO_LABELS: Record<string, string> = {
   propiedades:                 'Propiedades',
   clasificacion_incendio:      'Clasificación incendio',
   normalizacion_tecnica:       'Normalización técnica',
+  // Synthetic keys for derived rows
+  __corriente_max__:           'Corriente máx.',
+  __n_hilos__:                 'N° de hilos',
 };
 
 // ── Value humanizer ───────────────────────────────────────────────────────────
@@ -230,6 +233,30 @@ function renderAtributoValue(key: string, value: unknown): string | null {
   return humanizarValor(String(value));
 }
 
+// ── Derived field extractors ──────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extraerAmpacidad(atributos: Record<string, any>): string | null {
+  const amp = atributos?.performance_electrica?.ampacidad;
+  if (!amp) return null;
+  const partes: string[] = [];
+  if (amp.ducto_a)                      partes.push(`${amp.ducto_a}A en ducto`);
+  if (amp.aire_a)                        partes.push(`${amp.aire_a}A al aire`);
+  if (amp.enterrado_a)                   partes.push(`${amp.enterrado_a}A enterrado`);
+  if (amp.aire_formacion_triangular_a)   partes.push(`${amp.aire_formacion_triangular_a}A al aire (triángulo)`);
+  if (amp.aire_formacion_plana_a)        partes.push(`${amp.aire_formacion_plana_a}A al aire (plana)`);
+  if (partes.length === 0) return null;
+  const temp = amp.temperatura_ambiente_c ? ` a ${amp.temperatura_ambiente_c}°C` : '';
+  return partes.join(' · ') + temp;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extraerNHilos(atributos: Record<string, any>): string | null {
+  const n = atributos?.conductores?.n_hilos;
+  if (!n) return null;
+  return `${n} hilos`;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ProductoDetailPage() {
@@ -330,12 +357,24 @@ export default function ProductoDetailPage() {
       return [[key, rendered] as [string, string]];
     });
 
-  const prioritySet    = new Set(PRIORITY_FIELDS);
-  const priorityMap    = new Map(displayEntries);
-  const priorityRows   = PRIORITY_FIELDS
-    .filter((f) => priorityMap.has(f))
-    .map((f) => [f, priorityMap.get(f)!] as [string, string]);
-  const advancedRows   = displayEntries.filter(([key]) => !prioritySet.has(key));
+  const prioritySet  = new Set(PRIORITY_FIELDS);
+  const priorityMap  = new Map(displayEntries);
+
+  // Derived rows extracted from nested objects (not top-level atributos keys)
+  const ampacidadVal = extraerAmpacidad(rawAtributos as Record<string, unknown>);
+  const nHilosVal    = extraerNHilos(rawAtributos as Record<string, unknown>);
+
+  // Build priorityRows in order; inject derived rows right after calibre
+  const priorityRows: [string, string][] = [];
+  for (const f of PRIORITY_FIELDS) {
+    if (f === 'material_conductor') {
+      if (ampacidadVal) priorityRows.push(['__corriente_max__', ampacidadVal]);
+      if (nHilosVal)    priorityRows.push(['__n_hilos__',       nHilosVal]);
+    }
+    if (priorityMap.has(f)) priorityRows.push([f, priorityMap.get(f)!]);
+  }
+
+  const advancedRows = displayEntries.filter(([key]) => !prioritySet.has(key));
 
   const hasSpecs = displayEntries.length > 0 || !!producto.codigo_fabricante;
   const codOffset = producto.codigo_fabricante ? 1 : 0;
