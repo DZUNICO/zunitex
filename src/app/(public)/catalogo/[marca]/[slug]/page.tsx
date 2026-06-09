@@ -98,6 +98,79 @@ const ATRIBUTO_LABELS: Record<string, string> = {
   normalizacion_tecnica:       'Normalización técnica',
 };
 
+// ── Value humanizer ───────────────────────────────────────────────────────────
+
+const VALOR_LABELS: Record<string, string> = {
+  // Materiales
+  cobre_blando:                         'Cobre blando',
+  cobre_duro:                           'Cobre duro',
+  aluminio:                             'Aluminio',
+  // Aislamientos
+  HFFR_termoplastico_libre_halogenos:   'HFFR termoplástico libre de halógenos',
+  PVC_low_smoke:                        'PVC baja emisión de humos',
+  PVC:                                  'PVC',
+  XLPE:                                 'XLPE polietileno reticulado',
+  EPR:                                  'EPR caucho etileno propileno',
+  // Nivel de tensión
+  bt:                                   'Baja tensión',
+  mt:                                   'Media tensión',
+  at:                                   'Alta tensión',
+  // Presentación
+  rollo_100m:                           'Rollo 100m',
+  rollo_200m:                           'Rollo 200m',
+  rollo_500m:                           'Rollo 500m',
+  carrete_madera:                       'Carrete de madera',
+  metro:                                'Por metro',
+  // Métodos de instalación
+  ducto_conduit:                        'Ducto / Conduit',
+  interior_seco:                        'Interior seco',
+  interior_humedo:                      'Interior húmedo',
+  bandejas_interiores:                  'Bandejas interiores',
+  bandeja_abierta:                      'Bandeja abierta',
+  enterrado_directo:                    'Enterrado directo',
+  al_aire_libre:                        'Al aire libre',
+  superficie:                           'Superficie',
+  bandeja:                              'Bandeja',
+  ducto:                                'Ducto',
+  // Aplicaciones
+  instalaciones_fijas:                  'Instalaciones fijas',
+  ambientes_poco_ventilados:            'Ambientes poco ventilados',
+  edificaciones_criticas:               'Edificaciones críticas',
+  areas_con_riesgo_incendio:            'Áreas con riesgo de incendio',
+  proteccion_equipos_electronicos:      'Protección de equipos electrónicos',
+  edificaciones_residenciales:          'Edificaciones residenciales',
+  alumbrado:                            'Alumbrado',
+  tomacorrientes:                       'Tomacorrientes',
+  uso_general:                          'Uso general',
+  // Propiedades (ya transformadas a "clave con espacios" por replace(/_/g,' '))
+  'libre halogenos':                    'Libre de halógenos',
+  'baja emision humos':                 'Baja emisión de humos',
+  'no propagacion llama':               'No propagación de llama',
+  'no propagacion incendio':            'No propagación de incendio',
+  'resistente uv':                      'Resistente a UV',
+  'resistente humedad':                 'Resistente a humedad',
+  'resistente aceites':                 'Resistente a aceites',
+  'resistente quimicos':                'Resistente a químicos',
+  antiroedor:                           'Antiroedor',
+  apantallado:                          'Apantallado',
+  // Clase conductor
+  CL2:                                  'Clase 2',
+  CL5:                                  'Clase 5',
+  // Colores
+  'verde-amarillo':                     'Verde-Amarillo (tierra)',
+  negro:                                'Negro',
+  rojo:                                 'Rojo',
+  blanco:                               'Blanco',
+  azul:                                 'Azul',
+  amarillo:                             'Amarillo',
+};
+
+function humanizarValor(value: string): string {
+  if (VALOR_LABELS[value]) return VALOR_LABELS[value];
+  // Fallback: replace underscores with spaces and capitalize first letter
+  return value.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+}
+
 // ── Value renderer ────────────────────────────────────────────────────────────
 
 function renderAtributoValue(key: string, value: unknown): string | null {
@@ -105,11 +178,11 @@ function renderAtributoValue(key: string, value: unknown): string | null {
 
   if (typeof value === 'boolean') return value ? 'Sí' : 'No';
 
-  // Arrays
+  // Arrays — humanize each string item
   if (Array.isArray(value)) {
     const items = (value as unknown[])
       .filter((v) => v !== null && v !== undefined && v !== '')
-      .map(String);
+      .map((v) => humanizarValor(String(v)));
     return items.length > 0 ? items.join(', ') : null;
   }
 
@@ -122,21 +195,21 @@ function renderAtributoValue(key: string, value: unknown): string | null {
       return `${obj.valor} ${unidad}`;
     }
 
-    // propiedades boolean map — show only true keys
+    // propiedades boolean map — humanize the true key names
     if (key === 'propiedades') {
       const props = Object.entries(obj)
         .filter(([, v]) => v === true)
-        .map(([k]) => k.replace(/_/g, ' '));
+        .map(([k]) => humanizarValor(k.replace(/_/g, ' ')));
       return props.length > 0 ? props.join(' · ') : null;
     }
 
-    // Other objects — "key: value" pairs, skip nulls and nested objects
+    // Other objects — "label: humanized value" pairs, skip nulls and nested objects
     const parts: string[] = [];
     for (const [k, v] of Object.entries(obj)) {
       if (v === null || v === undefined || v === '') continue;
       if (typeof v === 'object') continue;   // skip deeply nested
-      const label = k.replace(/_/g, ' ');
-      const formatted = typeof v === 'boolean' ? (v ? 'Sí' : 'No') : String(v);
+      const label = k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+      const formatted = typeof v === 'boolean' ? (v ? 'Sí' : 'No') : humanizarValor(String(v));
       parts.push(`${label}: ${formatted}`);
     }
     return parts.length > 0 ? parts.join(' · ') : null;
@@ -154,7 +227,7 @@ function renderAtributoValue(key: string, value: unknown): string | null {
   if (key === 'diametro_pulg')                                   return `${value}"`;
   if (key === 'longitud_m')                                      return `${value} m`;
 
-  return String(value);
+  return humanizarValor(String(value));
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
