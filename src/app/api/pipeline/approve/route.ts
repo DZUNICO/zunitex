@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPipelineClient }         from '@/lib/supabase/pipeline-client';
 import { getVerifiedAdmin }          from '@/lib/firebase/admin';
-import type { ExtraccionResult }     from '@/lib/pipeline/types';
+import type { ExtraccionResult, Variante } from '@/lib/pipeline/types';
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -15,17 +15,32 @@ function slugify(text: string): string {
     .replace(/[^a-z0-9\s-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
-    .slice(0, 120);
+    .replace(/-+/g, '-')
+    .slice(0, 100);
+}
+
+// "2.5mm2" (display) and "2-5mm2" (slug-safe) from a Seccion
+function calibreDisplay(seccion: Variante['seccion']): string {
+  return `${seccion.valor}${seccion.unidad.toLowerCase()}`;
+}
+
+function calibreSlug(seccion: Variante['seccion']): string {
+  return String(seccion.valor).replace('.', '-') + seccion.unidad.toLowerCase();
 }
 
 // ── POST /api/pipeline/approve ────────────────────────────────────────────────
+// ADR-002: inserts N rows in productos_catalogo — one per VARIANTE.
+// ADR-003: only reads edited_json/raw_json, never modifies raw_json.
+// ADR-006: all rows inserted with disponible_peru = false.
 
 export async function POST(request: NextRequest) {
+  // ── Auth ────────────────────────────────────────────────────────────────────
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return errorResponse('Autorización requerida', 401);
   const admin = await getVerifiedAdmin(authHeader.slice(7));
   if (!admin) return errorResponse('Acceso denegado: se requiere rol admin', 403);
 
+  // ── Parse body ──────────────────────────────────────────────────────────────
   let body: { candidato_id?: string };
   try {
     body = await request.json() as { candidato_id?: string };
@@ -34,7 +49,8 @@ export async function POST(request: NextRequest) {
   }
   if (!body.candidato_id) return errorResponse('candidato_id requerido', 400);
 
-  // ── 1. Obtener el candidato ──────────────────────────────────────────────
+  // ── 1. Fetch candidato ──────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: candidato, error: fetchError } = await getPipelineClient()
     .from('pipeline_candidatos')
     .select('*')
@@ -49,94 +65,136 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── 2. Resolver JSON final ───────────────────────────────────────────────
-  const finalJson = (candidato.edited_json ?? candidato.raw_json) as ExtraccionResult | null;
+  // ── 2. Resolve final JSON (ADR-003: raw_json is never modified) ─────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const finalJson = ((candidato as any).edited_json ?? (candidato as any).raw_json) as ExtraccionResult | null;
   if (!finalJson?.PRODUCTO_CORE) {
-    return errorResponse('El candidato no tiene datos válidos para insertar', 422);
+    return errorResponse('El candidato no tiene datos válidos (PRODUCTO_CORE ausente)', 422);
+  }
+  if (!Array.isArray(finalJson.VARIANTES) || finalJson.VARIANTES.length === 0) {
+    return errorResponse('El candidato no tiene VARIANTES válidas para insertar', 422);
   }
 
-  const core = finalJson.PRODUCTO_CORE;
+  const core     = finalJson.PRODUCTO_CORE;
+  const variantes = finalJson.VARIANTES;
 
-  // ── 3. Construir el registro para productos_catalogo ────────────────────
-  const marca       = core.fabricante ?? candidato.fabricante ?? 'desconocido';
-  const modelo      = core.nombre_comercial ?? core.tipo_cable ?? 'sin-modelo';
-  const baseSlug    = slugify(`${marca}-${modelo}`);
-  // Agregar sufijo corto para evitar colisiones (timestamp últimos 6 dígitos)
-  const slug        = `${baseSlug}-${Date.now().toString(36).slice(-4)}`;
+  // ── 3. Shared identifiers for this candidato's row group ────────────────────
+  // producto_padre_id: one UUID for all rows from this candidato (ADR-002)
+  const productoPadreId = crypto.randomUUID();
 
-  // atributos: specs técnicas + variantes embebidas en el JSONB
-  const atributos = {
-    tipo_cable:           core.tipo_cable,
-    nivel_tension:        core.nivel_tension,
-    tension_nominal:      core.tension_nominal,
-    temperatura_operacion_c: core.temperatura_operacion_c,
-    temperatura_cortocircuito_c: core.temperatura_cortocircuito_c,
-    material_conductor:   core.material_conductor,
-    clase_conductor:      core.clase_conductor,
-    material_aislamiento: core.material_aislamiento,
-    material_cubierta:    core.material_cubierta,
-    propiedades:          core.propiedades,
-    metodos_instalacion:  core.metodos_instalacion,
-    aplicaciones:         core.aplicaciones,
-    clasificacion_incendio: core.clasificacion_incendio,
-    normas_ensayo:        core.normas_ensayo,
-    certificaciones:      core.certificaciones,
-    normalizacion_tecnica: core.normalizacion_tecnica,
-    variantes:            finalJson.VARIANTES,
-    extensiones:          finalJson.EXTENSIONES_DINAMICAS,
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tipoNormalizado = (candidato as any).tipo_cable_normalizado as string | null;
+  const marcaRaw   = core.fabricante ?? (candidato as any).fabricante ?? 'Desconocido';
+  const marcaSlug  = slugify(marcaRaw);
+  const tipoSlug   = slugify(tipoNormalizado ?? core.tipo_cable ?? 'cable');
 
-  const fichaUrl = Array.isArray(core.media?.fichas_pdf) && core.media.fichas_pdf[0]?.url
-    ? core.media.fichas_pdf[0].url
-    : null;
+  // PDF from candidato upload or from core media
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fichaUrl: string | null = (candidato as any).raw_pdf_url
+    ?? (Array.isArray(core.media?.fichas_pdf) && core.media.fichas_pdf[0]?.url
+        ? core.media.fichas_pdf[0].url
+        : null);
 
-  const insertPayload = {
-    marca,
-    modelo,
-    descripcion:        core.descripcion_corta ?? core.descripcion_tecnica ?? null,
-    categoria:          core.tipo_cable ?? core.familia ?? null,
-    slug,
-    nombres_alternativos: core.aliases_busqueda ?? [],
-    atributos,
-    normas:             core.normas_producto ?? [],
-    disponible_peru:    false,   // el admin lo activa manualmente en el catálogo
-    ficha_tecnica_pdf:  fichaUrl,
-    codigo_fabricante:  (finalJson.VARIANTES?.[0]?.sku_fabricante) ?? null,
-  };
+  // ── 4. Build one row per variante (ADR-002) ─────────────────────────────────
+  const rows = variantes.map((v) => {
+    // Slug format: {marca}-{tipo}-{calibre}  e.g. indeco-nh-90-2-5mm2
+    const slug = slugify(`${marcaSlug}-${tipoSlug}-${calibreSlug(v.seccion)}`);
 
-  // ── 4. INSERT en productos_catalogo ─────────────────────────────────────
+    // atributos jsonb: graph IDs + core context + variant-specific data (ADR-001)
+    const atributos = {
+      // Graph identifiers (ADR-002)
+      producto_padre_id:   productoPadreId,
+      variante_id:         calibreDisplay(v.seccion),   // "2.5mm2", "14awg"
+
+      // Core data shared across all rows of this candidato
+      tipo_cable:                    core.tipo_cable,
+      nivel_tension:                 core.nivel_tension,
+      tension_nominal:               core.tension_nominal,
+      temperatura_operacion_c:       core.temperatura_operacion_c,
+      temperatura_cortocircuito_c:   core.temperatura_cortocircuito_c,
+      material_conductor:            core.material_conductor,
+      clase_conductor:               core.clase_conductor,
+      material_aislamiento:          core.material_aislamiento,
+      material_cubierta:             core.material_cubierta,
+      propiedades:                   core.propiedades,
+      clasificacion_incendio:        core.clasificacion_incendio,
+      metodos_instalacion:           core.metodos_instalacion,
+      aplicaciones:                  core.aplicaciones,
+      normalizacion_tecnica_core:    core.normalizacion_tecnica,
+      certificaciones:               core.certificaciones,
+
+      // Variant-specific technical data
+      configuracion_display:         v.configuracion_display,
+      conductores:                   v.conductores,
+      seccion:                       v.seccion,
+      normalizacion_tecnica:         v.normalizacion_tecnica,
+      diametros:                     v.diametros,
+      peso_kg_km:                    v.peso_kg_km,
+      radio_minimo_curvatura_mm:     v.radio_minimo_curvatura_mm,
+      traccion_maxima_n:             v.traccion_maxima_n,
+      performance_electrica:         v.performance_electrica,
+      colores_disponibles:           v.colores_disponibles,
+      presentacion:                  v.presentacion,
+
+      // Extensions and graph relations (same for all rows)
+      extensiones:                   finalJson.EXTENSIONES_DINAMICAS,
+      graph_relations:               finalJson.GRAPH_RELATIONS,
+    };
+
+    return {
+      marca:                marcaRaw,
+      modelo:               core.nombre_comercial ?? core.tipo_cable ?? 'sin-modelo',
+      descripcion:          core.descripcion_corta ?? core.descripcion_tecnica ?? null,
+      categoria:            tipoNormalizado ?? core.tipo_cable ?? null,
+      slug,
+      nombres_alternativos: core.aliases_busqueda ?? [],
+      atributos,
+      normas:               core.normas_producto ?? [],
+      disponible_peru:      false,                          // ADR-006
+      ficha_tecnica_pdf:    fichaUrl,
+      codigo_fabricante:    v.sku_fabricante ?? null,
+    };
+  });
+
+  // ── 5. Batch upsert — onConflict slug handles re-approvals safely ───────────
   const { data: inserted, error: insertError } = await getPipelineClient()
     .from('productos_catalogo')
-    .insert(insertPayload)
-    .select('id')
-    .single();
+    .upsert(rows, { onConflict: 'slug' })
+    .select('id');
 
-  if (insertError || !inserted) {
+  if (insertError || !inserted || inserted.length === 0) {
     return errorResponse(
-      `Error al insertar en catálogo: ${insertError?.message ?? 'error desconocido'}`,
+      `Error al insertar en catálogo: ${insertError?.message ?? 'sin resultados'}`,
       500,
     );
   }
 
-  // ── 5. Marcar candidato como aprobado ────────────────────────────────────
+  // ── 6. Mark candidato as approved ───────────────────────────────────────────
   const { error: updateError } = await getPipelineClient()
     .from('pipeline_candidatos')
     .update({
       status:      'approved',
       final_json:  finalJson,
-      producto_id: inserted.id,
+      producto_id: inserted[0].id,        // first row ID for backward compat
       reviewed_by: admin.uid,
       reviewed_at: new Date().toISOString(),
     })
     .eq('id', body.candidato_id);
 
   if (updateError) {
-    // El producto ya fue insertado — registrar el error pero no fallar totalmente
+    // Rows were inserted — return 207 with warning so the UI can handle it
     return NextResponse.json({
-      producto_id: inserted.id,
-      warning: `Producto insertado pero error al actualizar candidato: ${updateError.message}`,
+      producto_id:      inserted[0].id,
+      filas_insertadas: inserted.length,
+      ids:              (inserted as { id: string }[]).map((r) => r.id),
+      warning: `Filas insertadas pero error al actualizar candidato: ${updateError.message}`,
     }, { status: 207 });
   }
 
-  return NextResponse.json({ producto_id: inserted.id, approved: true });
+  return NextResponse.json({
+    producto_id:      inserted[0].id,     // backward compat with UI
+    filas_insertadas: inserted.length,
+    ids:              (inserted as { id: string }[]).map((r) => r.id),
+    approved:         true,
+  });
 }
