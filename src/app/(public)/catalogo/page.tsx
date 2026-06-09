@@ -208,19 +208,26 @@ function CatalogoInner() {
     ]).then(([{ data: filterData }, { data: imgData }]) => {
       if (filterData) {
         const rows = filterData as { categoria: string; marca: string }[];
-        setCategorias([...new Set(rows.map((d) => d.categoria).filter(Boolean))].sort() as string[]);
+        const cats = [...new Set(rows.map((d) => d.categoria).filter(Boolean))].sort() as string[];
+        setCategorias(cats);
         setMarcas([...new Set(rows.map((d) => d.marca).filter(Boolean))].sort() as string[]);
-      }
-      if (imgData) {
-        const seen = new Set<string>();
-        const preview: CategoriaPreview[] = [];
-        for (const row of imgData as { categoria: string; imagen_url: string | null }[]) {
-          if (row.categoria && !seen.has(row.categoria)) {
-            seen.add(row.categoria);
-            preview.push({ categoria: row.categoria, imagen_url: row.imagen_url });
+
+        // Build image map from imgData (categories without images are still shown)
+        const imageMap = new Map<string, string | null>();
+        if (imgData) {
+          for (const row of imgData as { categoria: string; imagen_url: string | null }[]) {
+            if (row.categoria && !imageMap.has(row.categoria)) {
+              imageMap.set(row.categoria, row.imagen_url);
+            }
           }
         }
-        setCategoriasPreview(preview.sort((a, b) => a.categoria.localeCompare(b.categoria)));
+
+        // Every visible category gets a preview entry; image is null if not available
+        const preview: CategoriaPreview[] = cats.map((cat) => ({
+          categoria:  cat,
+          imagen_url: imageMap.get(cat) ?? null,
+        }));
+        setCategoriasPreview(preview);
       }
     });
   }, []);
