@@ -156,15 +156,15 @@ function VarianteCard({
       <div className="grid grid-cols-2 gap-2">
         <FieldRow label="N° de polos">
           <Select
-            value={String(v.conductores?.cantidad ?? '')}
-            onValueChange={(val) => onUpdateNestedWithDisplay(idx, 'conductores', 'cantidad', val === '' ? null : Number(val))}
+            value={String(v.conductores?.cantidad ?? 'none')}
+            onValueChange={(val) => onUpdateNestedWithDisplay(idx, 'conductores', 'cantidad', val === 'none' ? null : Number(val))}
             disabled={disabled}
           >
             <SelectTrigger className="h-7 text-xs">
               <SelectValue placeholder="—" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">—</SelectItem>
+              <SelectItem value="none">—</SelectItem>
               <SelectItem value="1">1</SelectItem>
               <SelectItem value="2">2</SelectItem>
               <SelectItem value="3">3</SelectItem>
