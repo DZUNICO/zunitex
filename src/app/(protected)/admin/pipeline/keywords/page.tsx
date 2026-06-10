@@ -13,6 +13,7 @@ import {
 import { useToast }       from '@/hooks/use-toast';
 import { Loader2, Upload, BarChart2, ArrowLeft } from 'lucide-react';
 import Link               from 'next/link';
+import { CABLE_NOMENCLATURE } from '@/lib/pipeline/cable-nomenclature';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,14 +28,9 @@ const MAX_FILES = 5;
 type FileResult  = { filename: string; inserted: number; errors: string[] };
 type BatchResult = { total_inserted: number; total_errors: number; files: FileResult[] };
 
-// ── Cable type options (CABLE_NOMENCLATURE keys) ──────────────────────────────
+// ── Cable type options — derived from CABLE_NOMENCLATURE so new types appear automatically
 
-const CABLE_TYPES = [
-  'TW-80', 'THW-90', 'NH', 'NHX-90',
-  'N2XOH', 'NYY', 'N2XY', 'RV-K',
-  'NLT', 'CTM', 'GPT', 'WS', 'SGT',
-  'SOLAR_DC', 'UTP_CAT6', 'FPL', 'DESNUDO_TEMPLE_BLANDO',
-];
+const CABLE_TYPES = Object.keys(CABLE_NOMENCLATURE).sort();
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-PE', {

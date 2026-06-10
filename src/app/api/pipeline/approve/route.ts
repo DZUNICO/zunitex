@@ -28,6 +28,22 @@ function calibreSlug(seccion: Variante['seccion']): string {
   return String(seccion.valor).replace('.', '-') + seccion.unidad.toLowerCase();
 }
 
+// Build the calibre segment for the slug using configuracion_display as primary source.
+// "2x14 AWG" → "2x14awg"   "1x2.5 mm²" → "1x2-5mm2"
+// Falls back to calibreSlug(seccion) when configuracion_display is absent.
+// NOTE: rows approved before this change (NH-90, TW-80, THW-90) have slugs without
+// the quantity prefix (e.g. indeco-nh-90-2-5mm2). New approvals use the full format
+// (e.g. indeco-nh-90-1x2-5mm2). Opción A: co-exist, no migration needed (ADR-002).
+function slugFromConfiguracionDisplay(configDisplay: string | null, seccion: Variante['seccion']): string {
+  if (!configDisplay) return calibreSlug(seccion);
+  return configDisplay
+    .toLowerCase()
+    .replace(/\s+/g, '')          // remove spaces: "2x14 awg" → "2x14awg"
+    .replace('mm²', 'mm2')        // normalise superscript
+    .replace(/\./g, '-')          // "2.5" → "2-5"
+    .replace(/[^a-z0-9x\-]/g, ''); // keep only alphanumeric, x, hyphen
+}
+
 // Ensure a space between digit and "AWG": "1x14AWG" → "1x14 AWG"
 function formatearConfiguracionDisplay(valor: string | null): string | null {
   if (!valor) return valor;
@@ -123,8 +139,10 @@ export async function POST(request: NextRequest) {
 
   // ── 4. Build one row per variante (ADR-002) ─────────────────────────────────
   const rows = variantes.map((v) => {
-    // Slug format: {marca}-{tipo}-{calibre}  e.g. indeco-nh-90-2-5mm2
-    const slug = slugify(`${marcaSlug}-${tipoSlug}-${calibreSlug(v.seccion)}`);
+    // Slug: {marca}-{tipo}-{cantidad×calibre}  e.g. indeco-nlt-2x14awg, indeco-nh-90-1x2-5mm2
+    const slug = `${marcaSlug}-${tipoSlug}-${slugFromConfiguracionDisplay(v.configuracion_display, v.seccion)}`
+      .replace(/-+/g, '-')
+      .slice(0, 120);
 
     // atributos jsonb: graph IDs + core context + variant-specific data (ADR-001)
     const atributos = {
