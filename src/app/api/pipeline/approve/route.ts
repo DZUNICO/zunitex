@@ -28,6 +28,12 @@ function calibreSlug(seccion: Variante['seccion']): string {
   return String(seccion.valor).replace('.', '-') + seccion.unidad.toLowerCase();
 }
 
+// Ensure a space between digit and "AWG": "1x14AWG" → "1x14 AWG"
+function formatearConfiguracionDisplay(valor: string | null): string | null {
+  if (!valor) return valor;
+  return valor.replace(/(\d)(AWG)/gi, '$1 AWG');
+}
+
 // Build a short, SEO-friendly description specific to this variant.
 // Uses the normalized cable type + calibre; marks LSOH cables explicitly.
 function generarDescripcionCorta(
@@ -144,7 +150,7 @@ export async function POST(request: NextRequest) {
       certificaciones:               core.certificaciones,
 
       // Variant-specific technical data
-      configuracion_display:         v.configuracion_display,
+      configuracion_display:         formatearConfiguracionDisplay(v.configuracion_display),
       conductores:                   v.conductores,
       seccion:                       v.seccion,
       normalizacion_tecnica:         v.normalizacion_tecnica,
