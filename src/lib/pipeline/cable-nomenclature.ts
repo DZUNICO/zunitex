@@ -95,7 +95,7 @@ export const CABLE_NOMENCLATURE: Record<string, CableDefinicion> = {
     nombres_fabricantes: {
       INDECO: "THW-90 +PLUS",
       CELSA: "THW-90",
-      ELCOPE: "Cable THW 450/750V",
+      ELCOPE: "Cable THW-90",
     },
 
     aliases_busqueda_peru: [
@@ -111,7 +111,7 @@ export const CABLE_NOMENCLATURE: Record<string, CableDefinicion> = {
     notas: "Reemplaza TW-80 en ambientes húmedos. La norma base es 75°C pero el mercado peruano opera con 90°C como estándar.",
   },
 
-  "NH": {
+  "NH-90": {
     tipo_mercado_peru: "NH",
     descripcion_mercado: "Cable de cobre libre de halógenos para instalaciones en locales públicos, comerciales y con riesgo de incendio. No emite gases tóxicos al quemarse.",
 
@@ -123,8 +123,8 @@ export const CABLE_NOMENCLATURE: Record<string, CableDefinicion> = {
 
     nombres_fabricantes: {
       INDECO: "PC NH-90",             // PC = línea Practicable de Indeco
-      CELSA: "LSOH NH",
-      ELCOPE: "Alambre LSOH",
+      CELSA: "LSOH-90",
+      ELCOPE: "LSOH-90",
       MIGUELEZ: "Afirenas H07Z1-R",
     },
 
@@ -285,7 +285,10 @@ export const CABLE_NOMENCLATURE: Record<string, CableDefinicion> = {
     notas: "Origen norma española UNE. Presente en proyectos industriales. Menos común que N2XOH.",
   },
 
-  // ── FLEXIBLES ─────────────────────────────────────────────────────────────
+  // ── VULCANIZADOS ──────────────────────────────────────────────────────────
+  // NLT (liviano), NMT (mediano), NPT (pesado/1kV)
+  // El mercado peruano los llama "vulcanizados" — la NTP los llama "cordones"
+  // Principio 4: el graph habla el idioma del mercado
 
   "NLT": {
     tipo_mercado_peru: "NLT",
@@ -310,10 +313,72 @@ export const CABLE_NOMENCLATURE: Record<string, CableDefinicion> = {
     ],
     busquedas_mensuales_aprox: "100-1,000",
 
-    familia: "flexible",
-    subfamilia: "vulcanizado",
+    familia: "vulcanizado",
+    subfamilia: "nlt",
     notas: "NLT es el nombre de mercado en Peru. Técnicamente TTRF-70 / 60227 IEC 53. 'PC' en el nombre de Indeco significa Practicable — no es denominación técnica. El vulcanizado se vende más que el mellizo.",
   },
+
+  "NMT": {
+    tipo_mercado_peru: "NMT",
+    descripcion_mercado: "Cable vulcanizado flexible para servicio mediano. Equipos industriales portátiles, herramientas eléctricas de uso frecuente. Más robusto que NLT.",
+
+    tipo_tecnico_ntp: "TTRF-70",
+    codigo_iec: "60227 IEC 53",
+    norma_producto: ["NTP 370.252", "IEC 60227-5"],
+    temperatura_c: 70,
+    aislamiento_tecnico: "PVC flexible reforzado",
+
+    nombres_fabricantes: {
+      INDECO: "PRACTICABLE TTRF-70 (NMT-PC)",
+      ELCOPE: "Cable NMT",
+      CELSA: "NMT",
+    },
+
+    aliases_busqueda_peru: [
+      "cable nmt", "cable vulcanizado nmt", "cable nmt 3x12",
+      "cable nmt 3x10", "cable nmt 2x12", "cable nmt indeco",
+      "cable vulcanizado trifasico", "cable vulcanizado 3x12",
+      "cable vulcanizado pesado", "cable nmt precio",
+      "cable ttrf nmt", "cable flexible trifasico",
+    ],
+    busquedas_mensuales_aprox: "10-100",
+
+    familia: "vulcanizado",
+    subfamilia: "nmt",
+    notas: "NMT = servicio mediano. Mismo TTRF-70 que NLT pero para calibres más gruesos (12-10 AWG). El mercado peruano lo llama 'vulcanizado trifásico' o 'vulcanizado 3x12'. Configuraciones típicas: 2x12, 3x12, 3x10 AWG.",
+  },
+
+  "NPT": {
+    tipo_mercado_peru: "NPT",
+    descripcion_mercado: "Cable vulcanizado para servicio pesado. Equipos industriales de alta potencia, maquinaria, minería liviana. Tensión 600/1000V.",
+
+    tipo_tecnico_ntp: "NPT",
+    codigo_iec: "IEC 60502-1",
+    norma_producto: ["NTP-IEC 60502-1"],
+    temperatura_c: 90,
+    aislamiento_tecnico: "XLPE + cubierta PVC o neopreno",
+
+    nombres_fabricantes: {
+      INDECO: "NPT 0.6/1kV",
+      ELCOPE: "Cable NPT",
+      CELSA: "NPT",
+    },
+
+    aliases_busqueda_peru: [
+      "cable npt", "cable npt 3x10", "cable npt 3x8", "cable npt 3x6",
+      "cable npt 3x4", "cable npt indeco", "cable vulcanizado pesado",
+      "cable npt precio", "cable vulcanizado 600v", "cable flexible 1kv",
+      "cable npt trifasico", "cable npt 0.6/1kv",
+    ],
+    busquedas_mensuales_aprox: "10-100",
+
+    familia: "vulcanizado",
+    subfamilia: "npt",
+    notas: "NPT = servicio pesado. A diferencia de NLT y NMT (300/500V), el NPT opera a 600/1000V. Por eso INDECO lo clasifica en 'Residencial Estándares bajo 1kV' y no en 'Cordones'. El mercado lo sigue llamando vulcanizado pesado. Configuraciones típicas: 3x10, 3x8, 3x6, 3x4 AWG. Aislamiento XLPE en lugar de PVC.",
+  },
+
+  // ── FLEXIBLES ─────────────────────────────────────────────────────────────
+  // CTM (mellizo), GPT (automotriz), WS (soldadura), SGT (batería)
 
   "CTM": {
     tipo_mercado_peru: "CTM",
@@ -548,6 +613,8 @@ export function normalizarTipoCable(input: string): string | null {
   if (s.includes("NHX")) return "NHX-90"           // NHX-90 → entrada descontinuada
   if (s.includes("NH") || s.includes("LSOH") || s.includes("LSHF") || s.includes("H07Z1")) return "NH"
   if (s.includes("HFFR") && !s.includes("N2X")) return "NH"
+  if (s.includes("NPT") && !s.includes("NTP")) return "NPT"
+  if (s.includes("NMT")) return "NMT"
   if (s.includes("NLT") || s.includes("TTRF") || s.includes("PRACTICABLE")) return "NLT"
   if (s.includes("CTM") || s.includes("MELLIZO") || s.includes("PARALELO")) return "CTM"
   if (s.includes("GPT") || s.includes("AUTOMOTRIZ")) return "GPT"

@@ -79,7 +79,7 @@ const CONDUCTOR_VIRTUAL_KEY = 'conductores';
 // Cable types that belong to "Cables BT" in the category explorer
 const CATEGORIAS_CONDUCTORES = new Set([
   'NH-90', 'TW-80', 'THW-90', 'N2XOH', 'NYY', 'N2XY',
-  'RV-K', 'NLT', 'CTM', 'GPT', 'NHX-90', 'SOLAR_DC',
+  'RV-K', 'NLT', 'NMT', 'NPT', 'CTM', 'GPT', 'NHX-90', 'SOLAR_DC',
 ]);
 
 // Cable cross-section icon — standard visual representation in the electrical industry
