@@ -169,11 +169,13 @@ export async function POST(request: NextRequest) {
 
     return {
       marca:                marcaRaw,
-      modelo:               core.nombre_comercial ?? core.tipo_cable ?? 'sin-modelo',
-      descripcion:          generarDescripcionCorta(
-                              tipoNormalizado ?? core.tipo_cable ?? '',
-                              v,
-                              core.material_aislamiento ?? null,
+      modelo:               formatearConfiguracionDisplay(core.nombre_comercial ?? core.tipo_cable ?? 'sin-modelo') ?? 'sin-modelo',
+      descripcion:          formatearConfiguracionDisplay(
+                              generarDescripcionCorta(
+                                tipoNormalizado ?? core.tipo_cable ?? '',
+                                v,
+                                core.material_aislamiento ?? null,
+                              )
                             ),
       categoria:            tipoNormalizado ?? core.tipo_cable ?? null,
       slug,
