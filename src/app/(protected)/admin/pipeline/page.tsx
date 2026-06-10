@@ -30,6 +30,7 @@ import {
   BarChart2,
 } from 'lucide-react';
 import type { PipelineStatus } from '@/lib/pipeline/types';
+import { CABLE_NOMENCLATURE }  from '@/lib/pipeline/cable-nomenclature';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -49,25 +50,10 @@ type UploadState = 'idle' | 'uploading' | 'processing' | 'done';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const TIPOS_CABLE = [
-  { value: 'tw',              label: 'TW' },
-  { value: 'thw',             label: 'THW' },
-  { value: 'lsoh',            label: 'LSOH' },
-  { value: 'nh',              label: 'NH-80' },
-  { value: 'n2xoh',           label: 'N2XOH' },
-  { value: 'nlt',             label: 'NLT' },
-  { value: 'mellizo',         label: 'Mellizo' },
-  { value: 'soldadura',       label: 'Soldadura' },
-  { value: 'bateria',         label: 'Batería' },
-  { value: 'automotriz',      label: 'Automotriz' },
-  { value: 'solar',           label: 'Solar' },
-  { value: 'instrumentacion', label: 'Instrumentación' },
-  { value: 'control',         label: 'Control' },
-  { value: 'utp',             label: 'UTP' },
-  { value: 'coaxial',         label: 'Coaxial' },
-  { value: 'incendio',        label: 'Incendio' },
-  { value: 'alarma',          label: 'Alarma' },
-];
+const TIPOS_CABLE = Object.entries(CABLE_NOMENCLATURE)
+  .filter(([, def]) => def.status !== 'descontinuado')
+  .map(([clave, def]) => ({ value: clave, label: def.tipo_mercado_peru }))
+  .sort((a, b) => a.label.localeCompare(b.label));
 
 // ── Helper components ──────────────────────────────────────────────────────────
 

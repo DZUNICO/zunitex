@@ -30,7 +30,10 @@ type BatchResult = { total_inserted: number; total_errors: number; files: FileRe
 
 // ── Cable type options — derived from CABLE_NOMENCLATURE so new types appear automatically
 
-const CABLE_TYPES = Object.keys(CABLE_NOMENCLATURE).sort();
+const CABLE_TYPES = Object.entries(CABLE_NOMENCLATURE)
+  .filter(([, def]) => def.status !== 'descontinuado')
+  .map(([clave, def]) => ({ value: clave, label: def.tipo_mercado_peru }))
+  .sort((a, b) => a.label.localeCompare(b.label));
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-PE', {
@@ -257,7 +260,7 @@ export default function KeywordsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {CABLE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
