@@ -34,7 +34,7 @@ type SortCol = 'created_at' | 'marca' | 'categoria' | 'modelo' | 'disponible_per
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MARCAS_CONOCIDAS = ['INDECO', 'CELSA', 'ELCOPE', 'MIGUELEZ', 'NEXANS', 'CHINT'];
+// Brands loaded dynamically from the DB on mount
 
 const CATEGORIAS_ACTIVAS = Object.entries(CABLE_NOMENCLATURE)
   .filter(([, def]) => def.status !== 'descontinuado')
@@ -75,6 +75,7 @@ export default function AdminCatalogoPage() {
 
   // Busy state per row (for toggle spinner)
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [marcas,  setMarcas]  = useState<string[]>([]);
 
   const fetchProductos = useCallback(async () => {
     if (!user) return;
@@ -108,6 +109,18 @@ export default function AdminCatalogoPage() {
   }, [user, page, sortCol, sortDir, filterMarca, filterCategoria, filterDisponible]);
 
   useEffect(() => { fetchProductos(); }, [fetchProductos]);
+
+  // Load distinct brands once on mount
+  useEffect(() => {
+    if (!user) return;
+    user.getIdToken().then(async (token) => {
+      const res = await fetch('/api/admin/catalogo?action=brands', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json() as { brands?: string[] };
+      if (d.brands) setMarcas(d.brands);
+    });
+  }, [user]);
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filterMarca, filterCategoria, filterDisponible, sortCol, sortDir]);
@@ -220,7 +233,7 @@ export default function AdminCatalogoPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las marcas</SelectItem>
-            {MARCAS_CONOCIDAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            {marcas.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
           </SelectContent>
         </Select>
 

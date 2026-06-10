@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPipelineClient }         from '@/lib/supabase/pipeline-client';
 import { getVerifiedAdmin }          from '@/lib/firebase/admin';
 import type { ExtraccionResult, Variante } from '@/lib/pipeline/types';
+import { CABLE_NOMENCLATURE }        from '@/lib/pipeline/cable-nomenclature';
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -51,19 +52,25 @@ function formatearConfiguracionDisplay(valor: string | null): string | null {
 }
 
 // Build a short, SEO-friendly description specific to this variant.
-// Uses the normalized cable type + calibre; marks LSOH cables explicitly.
 function generarDescripcionCorta(
   tipoCable: string,
   variante: Variante,
   materialAislamiento: string | null,
 ): string {
-  const calibre = calibreDisplay(variante.seccion);   // "2.5mm2", "14awg"
+  const configDisplay = formatearConfiguracionDisplay(variante.configuracion_display) ?? '';
+  const calibre       = configDisplay || calibreDisplay(variante.seccion);
+
+  // Vulcanizados use configuracion_display to capture full "2x14 AWG" format
+  const defTipo = CABLE_NOMENCLATURE[tipoCable];
+  if (defTipo?.familia === 'vulcanizado' && configDisplay) {
+    return `Cable vulcanizado ${tipoCable} ${configDisplay}`;
+  }
 
   const esLibreHalogeno =
     tipoCable.includes('NH-90')  ||
     tipoCable.includes('N2XOH')  ||
-    (materialAislamiento ?? '').toLowerCase().includes('hffr')           ||
-    (materialAislamiento ?? '').toLowerCase().includes('lsoh')           ||
+    (materialAislamiento ?? '').toLowerCase().includes('hffr')  ||
+    (materialAislamiento ?? '').toLowerCase().includes('lsoh')  ||
     (materialAislamiento ?? '').toLowerCase().includes('libre de halog');
 
   const base = `Cable ${tipoCable} ${calibre}`.trim();
@@ -187,7 +194,9 @@ export async function POST(request: NextRequest) {
 
     return {
       marca:                marcaRaw,
-      modelo:               formatearConfiguracionDisplay(core.nombre_comercial ?? core.tipo_cable ?? 'sin-modelo') ?? 'sin-modelo',
+      modelo:               CABLE_NOMENCLATURE[tipoNormalizado ?? '']?.tipo_mercado_peru
+                              ?? formatearConfiguracionDisplay(core.nombre_comercial ?? core.tipo_cable ?? 'sin-modelo')
+                              ?? 'sin-modelo',
       descripcion:          formatearConfiguracionDisplay(
                               generarDescripcionCorta(
                                 tipoNormalizado ?? core.tipo_cable ?? '',
