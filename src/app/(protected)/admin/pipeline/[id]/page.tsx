@@ -126,7 +126,7 @@ function PropiedadesDisplay({ propiedades }: { propiedades: Record<string, boole
 // ── Variant card ───────────────────────────────────────────────────────────────
 
 function VarianteCard({
-  v, idx, canDelete, disabled, onUpdate, onUpdateNested, onUpdateDeep, onDelete,
+  v, idx, canDelete, disabled, onUpdate, onUpdateNested, onUpdateNestedWithDisplay, onUpdateDeep, onDelete,
 }: {
   v: Variante;
   idx: number;
@@ -134,6 +134,7 @@ function VarianteCard({
   disabled: boolean;
   onUpdate: (i: number, field: keyof Variante, val: unknown) => void;
   onUpdateNested: (i: number, sec: keyof Variante, field: string, val: unknown) => void;
+  onUpdateNestedWithDisplay: (i: number, sec: keyof Variante, field: string, val: unknown) => void;
   onUpdateDeep: (i: number, sec: keyof Variante, sub: string, field: string, val: unknown) => void;
   onDelete: (i: number) => void;
 }) {
@@ -153,11 +154,29 @@ function VarianteCard({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
+        <FieldRow label="N° de polos">
+          <Select
+            value={String(v.conductores?.cantidad ?? '')}
+            onValueChange={(val) => onUpdateNestedWithDisplay(idx, 'conductores', 'cantidad', val === '' ? null : Number(val))}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder="—" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">—</SelectItem>
+              <SelectItem value="1">1</SelectItem>
+              <SelectItem value="2">2</SelectItem>
+              <SelectItem value="3">3</SelectItem>
+              <SelectItem value="4">4</SelectItem>
+            </SelectContent>
+          </Select>
+        </FieldRow>
         <FieldRow label="Sección">
           <Input
             type="number"
             value={v.seccion?.valor ?? ''}
-            onChange={(e) => onUpdateNested(idx, 'seccion', 'valor', e.target.value === '' ? null : Number(e.target.value))}
+            onChange={(e) => onUpdateNestedWithDisplay(idx, 'seccion', 'valor', e.target.value === '' ? null : Number(e.target.value))}
             disabled={disabled}
             className="h-7 text-xs"
           />
@@ -165,7 +184,7 @@ function VarianteCard({
         <FieldRow label="Unidad">
           <Select
             value={v.seccion?.unidad ?? 'AWG'}
-            onValueChange={(val) => onUpdateNested(idx, 'seccion', 'unidad', val)}
+            onValueChange={(val) => onUpdateNestedWithDisplay(idx, 'seccion', 'unidad', val)}
             disabled={disabled}
           >
             <SelectTrigger className="h-7 text-xs">
@@ -366,6 +385,30 @@ export default function PipelineReviewPage() {
     const vs = [...json.VARIANTES];
     const prev = (vs[i][sec] as Record<string, unknown>) ?? {};
     vs[i] = { ...vs[i], [sec]: { ...prev, [field]: value } };
+    setJsonAndSchedule({ ...json, VARIANTES: vs });
+  }
+
+  // Like updateVariantNested but also regenerates configuracion_display
+  // from the updated conductores.cantidad + seccion values.
+  function updateVariantNestedWithDisplay(i: number, sec: keyof Variante, field: string, value: unknown) {
+    if (!json) return;
+    const vs = [...json.VARIANTES];
+    const prev = (vs[i][sec] as Record<string, unknown>) ?? {};
+    vs[i] = { ...vs[i], [sec]: { ...prev, [field]: value } };
+    // Read updated values from the patched variant
+    const v     = vs[i];
+    const polos = (v.conductores as Record<string, unknown>)?.cantidad as number | null ?? null;
+    const sVal  = (v.seccion    as Record<string, unknown>)?.valor    as number | null ?? null;
+    const sUnit = ((v.seccion   as Record<string, unknown>)?.unidad   as string) ?? 'AWG';
+    if (sVal != null) {
+      const unitDisplay = sUnit === 'mm2' ? 'mm²' : sUnit;
+      vs[i] = {
+        ...vs[i],
+        configuracion_display: polos != null
+          ? `${polos}x${sVal} ${unitDisplay}`
+          : `${sVal} ${unitDisplay}`,
+      };
+    }
     setJsonAndSchedule({ ...json, VARIANTES: vs });
   }
 
@@ -919,6 +962,7 @@ export default function PipelineReviewPage() {
                           disabled={isDone || busy}
                           onUpdate={updateVariant}
                           onUpdateNested={updateVariantNested}
+                          onUpdateNestedWithDisplay={updateVariantNestedWithDisplay}
                           onUpdateDeep={updateVariantDeep}
                           onDelete={deleteVariant}
                         />
