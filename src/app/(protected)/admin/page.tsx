@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/context/auth-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { FileText, Building2, Settings, DatabaseZap, BarChart2 } from 'lucide-react';
+import { FileText, Building2, Settings, DatabaseZap, BarChart2, Package } from 'lucide-react';
 
 interface QuickLink {
   icon: React.ElementType;
@@ -72,6 +72,12 @@ export default function AdminPage() {
       description: 'Extracción e ingesta de fichas técnicas con IA',
       href: '/admin/pipeline',
       badge: pipelinePendingCount,
+    },
+    {
+      icon: Package,
+      title: 'Catálogo',
+      description: 'Gestionar productos_catalogo — activar, precios, filtros',
+      href: '/admin/catalogo',
     },
     {
       icon: BarChart2,
